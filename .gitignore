@@ -1,0 +1,16 @@
+*.swp
+*.swo
+*~
+*CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.a
+*.o
+bin/*
+lib/*
+doxy/gen/*
+*.sublime-workspace
+*.sublime-project
+*.kdev4
+install_manifest.txt
