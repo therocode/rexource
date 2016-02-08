@@ -76,5 +76,18 @@ SCENARIO("ResourceProvider can manage sources")
                 CHECK_THROWS_AS(provider.addSource("people", PeopleSource("data/people")), rex::InvalidSourceException);
             }
         }
+
+        WHEN("two sources are added and cleared, and subsequently accessed")
+        {
+            THEN("exceptions are thrown")
+            {
+                provider.addSource("people", PeopleSource("data/people"));
+                provider.addSource("tools", ToolSource("data/tools"));
+                provider.clearSources();
+
+                CHECK_THROWS_AS(provider.source<PeopleSource>("people"), rex::InvalidSourceException);
+                CHECK_THROWS_AS(provider.source<ToolSource>("tools"), rex::InvalidSourceException);
+            }
+        }
     }
 }

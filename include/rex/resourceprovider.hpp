@@ -14,6 +14,7 @@ namespace rex
             template <typename SourceType>
             SourceView<SourceType> addSource(const std::string& sourceId, SourceType source);
             bool removeSource(const std::string& sourceId);
+            void clearSources();
         private:
             template <typename SourceType>
             SourceView<SourceType> sourceIteratorToView(std::unordered_map<std::string, th::Any>::const_iterator iterator) const;
@@ -64,5 +65,10 @@ namespace rex
             iterator->first,
             iterator->second.get<SourceType>(),
         };
+    }
+
+    inline void ResourceProvider::clearSources()
+    {
+        mSources.clear();
     }
 }
