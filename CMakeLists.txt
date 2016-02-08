@@ -19,6 +19,8 @@ project(${project_name} CXX)
 
 set(header_files
     include/rex/assert.hpp
+    include/rex/exceptions.hpp
+    include/rex/resourceprovider.hpp
 )
 
 include_directories("include")
@@ -28,6 +30,8 @@ include_directories("thero/include")
 if(BUILD_TESTS)
     include_directories(tests)
     add_executable(tests "tests/main.cpp"
+        "tests/helpers/peoplesource.cpp"
+        "tests/helpers/toolsource.cpp"
         "tests/resourceprovider.cpp"
         )
 
