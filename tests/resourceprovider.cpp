@@ -1,4 +1,7 @@
 #include <catch.hpp>
+#include <map>
+#include "helpers/person.hpp"
+#include "helpers/tool.hpp"
 #include "helpers/peoplesource.hpp"
 #include "helpers/toolsource.hpp"
 #include <rex/resourceprovider.hpp>
@@ -31,9 +34,9 @@ SCENARIO("ResourceProvider can manage sources")
                 CHECK(added.source.path() == "data/people");
             }
 
-            THEN("accessing the source from the provider gives the same source object as when returned")
+            THEN("accessing the source from the provider gives a view with same source id as when returned")
             {
-                CHECK(provider.source<PeopleSource>("people") == added);
+                CHECK(provider.source<PeopleSource>("people").id == added.id);
             }
 
             THEN("accessing the source with the wrong type causes an exception")
@@ -87,6 +90,104 @@ SCENARIO("ResourceProvider can manage sources")
 
                 CHECK_THROWS_AS(provider.source<PeopleSource>("people"), rex::InvalidSourceException);
                 CHECK_THROWS_AS(provider.source<ToolSource>("tools"), rex::InvalidSourceException);
+            }
+        }
+    }
+}
+
+SCENARIO("ResourceProvider can be used to access resources synchronously from sources")
+{
+    GIVEN("a resource provider with a source added")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("data/people"));
+
+        WHEN("valid resources are gotten")
+        {
+            const Person& person = provider.get<Person>("people", "anders");
+
+            THEN("the values are correct")
+            {
+                CHECK(person.name == "anders");
+                CHECK(person.age == 47);
+            }
+        }
+
+        WHEN("invalid resources are gotten")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.get<Person>("people", "ragnar"), rex::InvalidResourceException);
+            }
+        }
+
+        WHEN("valid resources are gotten with the wrong type")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.get<Tool>("people", "ragnar"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("invalid resources are gotten with the wrong type")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.get<Tool>("people", "ragnar"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("resources are gotten from invalid sources")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.get<Tool>("tools", "hammer"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("all resources are gotten from a valid source")
+        {
+            std::vector<rex::ResourceView<Person>> people = provider.getAll<Person>("people");
+
+            THEN("all resources are gotten with valid values")
+            {
+                REQUIRE(people.size() == 3);
+
+                std::map<std::string, int32_t> peopleSorted =
+                {
+                    {people[0].resource.name, people[0].resource.age},
+                    {people[1].resource.name, people[1].resource.age},
+                    {people[2].resource.name, people[2].resource.age},
+                };
+
+                REQUIRE(peopleSorted.size() == 3);
+
+                auto iter = peopleSorted.begin();
+                CHECK(iter->first == "anders");
+                CHECK(iter->second == 47);
+                ++iter;
+                CHECK(iter->first == "kalle");
+                CHECK(iter->second == 19);
+                ++iter;
+                CHECK(iter->first == "torsten");
+                CHECK(iter->second == 94);
+            }
+        }
+
+        WHEN("all resources are gotten from a valid source, but with wrong type")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.getAll<Tool>("people"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("all resources are gotten from an invalid source")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.getAll<Tool>("tools"), rex::InvalidSourceException);
             }
         }
     }
