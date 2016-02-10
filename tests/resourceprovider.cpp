@@ -262,7 +262,7 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
             provider.get<Person>("people", "anders");
             rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "anders");
 
-            THEN("the asynch access is resolved pretty much directly with correct values")
+            THEN("the async access is resolved pretty much directly with correct values")
             {
                 CHECK(personView.identifier == "anders");
                 REQUIRE(personView.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready);
@@ -278,7 +278,7 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
             rex::AsyncResourceView<Person> personView1 = provider.asyncGet<Person>("people", "anders");
             rex::AsyncResourceView<Person> personView2 = provider.asyncGet<Person>("people", "anders");
 
-            THEN("both asynch views are initially not ready but resolve later into the same value")
+            THEN("both async views are initially not ready but resolve later into the same value")
             {
                 CHECK(personView1.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
                 CHECK(personView2.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
@@ -293,6 +293,64 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
                 const Person& person2 = personView2.future.get();
                 CHECK(person2.name == "anders");
                 CHECK(person2.age == 47);
+            }
+        }
+    }
+}
+
+SCENARIO("ResourceProvider can be used to access all resources from a source in an asynchronous way")
+{
+    GIVEN("a resource provider with a source added")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("data/people", true));
+
+        WHEN("all resources are accessed asynchronously")
+        {
+            std::vector<rex::AsyncResourceView<Person>> allPeople = provider.asyncGetAll<Person>("people");
+
+            THEN("the async access is resolved pretty much directly with correct values")
+            {
+                REQUIRE(allPeople.size() == 3);
+
+                bool name1Good = allPeople[0].identifier == "anders" || allPeople[0].identifier == "kalle" || allPeople[0].identifier == "torsten";
+                bool name2Good = allPeople[1].identifier == "anders" || allPeople[1].identifier == "kalle" || allPeople[1].identifier == "torsten";
+                bool name3Good = allPeople[2].identifier == "anders" || allPeople[2].identifier == "kalle" || allPeople[2].identifier == "torsten";
+
+                CHECK(name1Good);
+                CHECK(name2Good);
+                CHECK(name3Good);
+
+                CHECK(allPeople[0].identifier != allPeople[1].identifier);
+                CHECK(allPeople[0].identifier != allPeople[2].identifier);
+                CHECK(allPeople[1].identifier != allPeople[2].identifier);
+            }
+
+            THEN("when the async accesses are resolved, the contained resources have correct values")
+            {
+                REQUIRE(allPeople[0].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
+                REQUIRE(allPeople[1].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
+                REQUIRE(allPeople[2].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
+
+                std::map<std::string, int32_t> peopleSorted =
+                {
+                    {allPeople[0].future.get().name, allPeople[0].future.get().age},
+                    {allPeople[1].future.get().name, allPeople[1].future.get().age},
+                    {allPeople[2].future.get().name, allPeople[2].future.get().age},
+                };
+
+                REQUIRE(peopleSorted.size() == 3);
+
+                auto iter = peopleSorted.begin();
+                CHECK(iter->first == "anders");
+                CHECK(iter->second == 47);
+                ++iter;
+                CHECK(iter->first == "kalle");
+                CHECK(iter->second == 19);
+                ++iter;
+                CHECK(iter->first == "torsten");
+                CHECK(iter->second == 94);
             }
         }
     }

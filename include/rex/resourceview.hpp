@@ -5,7 +5,7 @@ namespace rex
     template <typename ResourceType>
     struct ResourceView
     {
-        const std::string& id;
+        const std::string& identifier;
         const ResourceType& resource;
     };
 }

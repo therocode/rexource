@@ -38,6 +38,8 @@ namespace rex
             //async get
             template <typename ResourceType>
             AsyncResourceView<ResourceType> asyncGet(const std::string& sourceId, const std::string& resourceId) const;
+            template <typename ResourceType>
+            std::vector<AsyncResourceView<ResourceType>> asyncGetAll(const std::string& sourceId) const;
         private:
             template <typename SourceType>
             SourceView<SourceType> sourceIteratorToView(std::unordered_map<std::string, SourceEntry>::const_iterator iterator) const;
@@ -235,5 +237,11 @@ namespace rex
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
+    template <typename ResourceType>
+    std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGetAll(const std::string& sourceId) const
+    {
+        return {};
     }
 }
