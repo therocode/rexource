@@ -149,28 +149,15 @@ namespace rex
     template <typename ResourceType>
     std::vector<ResourceView<ResourceType>> ResourceProvider::getAll(const std::string& sourceId) const
     {
-        auto sourceIterator = mSources.find(sourceId);
+        std::vector<AsyncResourceView<ResourceType>> asyncViews = asyncGetAll<ResourceType>(sourceId);
+        std::vector<ResourceView<ResourceType>> result;
 
-        if(sourceIterator != mSources.end())
+        for(auto& asyncView : asyncViews)
         {
-            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
-                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
-
-            const auto& source = sourceIterator->second.source;
-
-            std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
-
-            std::vector<ResourceView<ResourceType>> result;
-
-            for(size_t i = 0; i < idList.size(); ++i)
-            {
-                result.emplace_back(ResourceView<ResourceType>{idList[i], std::move(get<ResourceType>(sourceId, idList[i]))});
-            }
-
-            return result;
+            result.emplace_back(ResourceView<ResourceType>{asyncView.identifier, asyncView.future.get()});
         }
-        else
-            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+
+        return result;
     }
 
     template <typename ResourceType>
