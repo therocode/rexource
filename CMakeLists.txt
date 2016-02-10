@@ -19,8 +19,11 @@ project(${project_name} CXX)
 
 set(header_files
     include/rex/assert.hpp
+    include/rex/asyncresourceview.hpp
     include/rex/exceptions.hpp
     include/rex/resourceprovider.hpp
+    include/rex/resourceview.hpp
+    include/rex/sourceview.hpp
 )
 
 include_directories("include")
@@ -38,7 +41,9 @@ if(BUILD_TESTS)
     set_property(TARGET tests PROPERTY CXX_STANDARD 14)
     set_property(TARGET tests PROPERTY CXX_STANDARD_REQUIRED ON)
 
-    #target_link_libraries(tests ${project_name})
+    find_package(Threads)
+
+    target_link_libraries(tests ${CMAKE_THREAD_LIBS_INIT})
 endif(BUILD_TESTS)
 
 #installation

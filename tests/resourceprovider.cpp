@@ -22,7 +22,7 @@ SCENARIO("ResourceProvider can manage sources")
 
         WHEN("a source is added")
         {
-            rex::SourceView<PeopleSource> added = provider.addSource("people", PeopleSource("data/people"));
+            rex::SourceView<PeopleSource> added = provider.addSource("people", PeopleSource("data/people", false));
 
             THEN("the return value's id is the added source's name")
             {
@@ -47,7 +47,7 @@ SCENARIO("ResourceProvider can manage sources")
 
         WHEN("a source is added and removed")
         {
-            provider.addSource("people", PeopleSource("data/people"));
+            provider.addSource("people", PeopleSource("data/people", false));
             bool removed = provider.removeSource("people");
 
             THEN("the function reports a removal")
@@ -75,8 +75,8 @@ SCENARIO("ResourceProvider can manage sources")
         {
             THEN("an exception is thrown")
             {
-                provider.addSource("people", PeopleSource("data/people"));
-                CHECK_THROWS_AS(provider.addSource("people", PeopleSource("data/people")), rex::InvalidSourceException);
+                provider.addSource("people", PeopleSource("data/people", false));
+                CHECK_THROWS_AS(provider.addSource("people", PeopleSource("data/people", false)), rex::InvalidSourceException);
             }
         }
 
@@ -84,7 +84,7 @@ SCENARIO("ResourceProvider can manage sources")
         {
             THEN("exceptions are thrown")
             {
-                provider.addSource("people", PeopleSource("data/people"));
+                provider.addSource("people", PeopleSource("data/people", false));
                 provider.addSource("tools", ToolSource("data/tools"));
                 provider.clearSources();
 
@@ -101,7 +101,7 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
     {
         rex::ResourceProvider provider;
 
-        provider.addSource("people", PeopleSource("data/people"));
+        provider.addSource("people", PeopleSource("data/people", false));
 
         WHEN("valid resources are gotten")
         {
@@ -126,15 +126,7 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
         {
             THEN("an exception is thrown")
             {
-                CHECK_THROWS_AS(provider.get<Tool>("people", "ragnar"), rex::InvalidSourceException);
-            }
-        }
-
-        WHEN("invalid resources are gotten with the wrong type")
-        {
-            THEN("an exception is thrown")
-            {
-                CHECK_THROWS_AS(provider.get<Tool>("people", "ragnar"), rex::InvalidSourceException);
+                CHECK_THROWS_AS(provider.get<Tool>("people", "anders"), rex::InvalidSourceException);
             }
         }
 
@@ -188,6 +180,119 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
             THEN("an exception is thrown")
             {
                 CHECK_THROWS_AS(provider.getAll<Tool>("tools"), rex::InvalidSourceException);
+            }
+        }
+    }
+}
+
+SCENARIO("ResourceProvider can be used to access resources asynchronously from sources")
+{
+    GIVEN("a resource provider with a source added")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("data/people", true));
+
+        WHEN("valid resources are accessed asynchronously")
+        {
+            rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "anders");
+
+            THEN("initially the name is correct and the value is a waiting std::future")
+            {
+                CHECK(personView.identifier == "anders");
+                CHECK(personView.future.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout);
+            }
+
+            THEN("when the resource is loaded, it can be properly accessed with the std::future")
+            {
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready);
+
+                const Person& person = personView.future.get();
+                CHECK(person.name == "anders");
+                CHECK(person.age == 47);
+            }
+        }
+
+        WHEN("invalid resources are accessed asynchronously")
+        {
+            rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "stellan");
+
+            THEN("initially the name is correct and the value is a waiting std::future")
+            {
+                CHECK(personView.identifier == "stellan");
+                CHECK(personView.future.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout);
+            }
+
+            THEN("when the resource is failed to load, accessing it throws an exception")
+            {
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready);
+
+                CHECK_THROWS_AS(personView.future.get(), rex::InvalidResourceException);
+            }
+        }
+
+        WHEN("valid resources are accessed asynchronously with the wrong type")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.asyncGet<Tool>("people", "anders"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("resources are accessed asynchronously from invalid sources")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.asyncGet<Tool>("tools", "hammer"), rex::InvalidSourceException);
+            }
+        }
+    }
+}
+
+SCENARIO("ResourceProvider can be used to access the same resources synchronously and asynchronously in a mixed way")
+{
+    GIVEN("a resource provider with a source added")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("data/people", true));
+
+        WHEN("resources are accessed asynchronously after being accessed synchronously")
+        {
+            provider.get<Person>("people", "anders");
+            rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "anders");
+
+            THEN("the asynch access is resolved pretty much directly with correct values")
+            {
+                CHECK(personView.identifier == "anders");
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready);
+
+                const Person& person = personView.future.get();
+                CHECK(person.name == "anders");
+                CHECK(person.age == 47);
+            }
+        }
+
+        WHEN("resources are accessed asynchronously after being accessed asynchronously")
+        {
+            rex::AsyncResourceView<Person> personView1 = provider.asyncGet<Person>("people", "anders");
+            rex::AsyncResourceView<Person> personView2 = provider.asyncGet<Person>("people", "anders");
+
+            THEN("both asynch views are initially not ready but resolve later into the same value")
+            {
+                CHECK(personView1.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
+                CHECK(personView2.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
+
+                REQUIRE(personView1.future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::ready);
+                REQUIRE(personView2.future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::ready);
+
+                const Person& person1 = personView1.future.get();
+                CHECK(person1.name == "anders");
+                CHECK(person1.age == 47);
+
+                const Person& person2 = personView2.future.get();
+                CHECK(person2.name == "anders");
+                CHECK(person2.age == 47);
             }
         }
     }

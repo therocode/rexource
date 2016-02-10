@@ -1,10 +1,12 @@
 #include "peoplesource.hpp"
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include <rex/exceptions.hpp>
 
-PeopleSource::PeopleSource(std::string path):
-    mPath(std::move(path))
+PeopleSource::PeopleSource(std::string path, bool simulateLatency):
+    mPath(std::move(path)),
+    mSimulateLatency(simulateLatency)
 {
     std::ifstream inFile(mPath);
 
@@ -28,6 +30,9 @@ const std::string& PeopleSource::path() const
 
 Person PeopleSource::load(const std::string& id) const
 {
+    if(mSimulateLatency)
+        delay();
+
     std::ifstream inFile(mPath);
 
     std::string line;
@@ -56,5 +61,13 @@ Person PeopleSource::load(const std::string& id) const
 
 std::vector<std::string> PeopleSource::list() const
 {
+    if(mSimulateLatency)
+        delay();
+
     return {mPersonIndex.begin(), mPersonIndex.end()};
+}
+
+void PeopleSource::delay() const
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 }
