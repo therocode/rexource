@@ -205,7 +205,7 @@ SCENARIO("ResourceProvider can be used to access resources asynchronously from s
 
             THEN("when the resource is loaded, it can be properly accessed with the std::future")
             {
-                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready);
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(150)) == std::future_status::ready);
 
                 const Person& person = personView.future.get();
                 CHECK(person.name == "anders");
@@ -225,7 +225,7 @@ SCENARIO("ResourceProvider can be used to access resources asynchronously from s
 
             THEN("when the resource is failed to load, accessing it throws an exception")
             {
-                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready);
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(150)) == std::future_status::ready);
 
                 CHECK_THROWS_AS(personView.future.get(), rex::InvalidResourceException);
             }
@@ -265,7 +265,7 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
             THEN("the async access is resolved pretty much directly with correct values")
             {
                 CHECK(personView.identifier == "anders");
-                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready);
+                REQUIRE(personView.future.wait_for(std::chrono::milliseconds(10)) == std::future_status::ready);
 
                 const Person& person = personView.future.get();
                 CHECK(person.name == "anders");
@@ -280,11 +280,11 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
 
             THEN("both async views are initially not ready but resolve later into the same value")
             {
-                CHECK(personView1.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
-                CHECK(personView2.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
+                CHECK(personView1.future.wait_for(std::chrono::milliseconds(10)) == std::future_status::timeout);
+                CHECK(personView2.future.wait_for(std::chrono::milliseconds(10)) == std::future_status::timeout);
 
-                REQUIRE(personView1.future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::ready);
-                REQUIRE(personView2.future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::ready);
+                REQUIRE(personView1.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready);
+                REQUIRE(personView2.future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready);
 
                 const Person& person1 = personView1.future.get();
                 CHECK(person1.name == "anders");
@@ -329,9 +329,9 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
 
             THEN("when the async accesses are resolved, the contained resources have correct values")
             {
-                REQUIRE(allPeople[0].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
-                REQUIRE(allPeople[1].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
-                REQUIRE(allPeople[2].future.wait_for(std::chrono::milliseconds(2000)) == std::future_status::ready);
+                REQUIRE(allPeople[0].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+                REQUIRE(allPeople[1].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+                REQUIRE(allPeople[2].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
 
                 std::map<std::string, int32_t> peopleSorted =
                 {
@@ -351,6 +351,22 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
                 ++iter;
                 CHECK(iter->first == "torsten");
                 CHECK(iter->second == 94);
+            }
+        }
+
+        WHEN("all resources are accessed asynchronously with the wrong type")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.asyncGetAll<Tool>("people"), rex::InvalidSourceException);
+            }
+        }
+
+        WHEN("all resources are accessed asynchronously from an invalid source")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.asyncGetAll<Tool>("tools"), rex::InvalidSourceException);
             }
         }
     }

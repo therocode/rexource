@@ -7,7 +7,7 @@ namespace rex
     template <typename ResourceType>
     struct AsyncResourceView
     {
-        const std::string& identifier;
+        std::string identifier;
         std::shared_future<const ResourceType&> future;
     };
 }

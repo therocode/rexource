@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <unordered_map>
 #include <thero/any.hpp>
 #include <rex/exceptions.hpp>
@@ -50,6 +51,7 @@ namespace rex
             std::unordered_map<std::string, SourceEntry> mSources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mResources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mAsyncProcesses;
+            mutable std::mutex mResourceMutex;
     };
 
     template <typename SourceType>
@@ -87,6 +89,8 @@ namespace rex
         };
 
         auto added = mSources.emplace(sourceId, SourceEntry{std::move(source), loadingFunction, listingFunction, typeid(ResourceType)});
+        mResources[sourceId];
+        mAsyncProcesses[sourceId];
 
         if(added.second)
             return sourceIteratorToView<SourceType>(added.first);
@@ -186,7 +190,7 @@ namespace rex
             else
             {
                 std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
-                auto emplaced = mAsyncProcesses[sourceId].emplace(resourceId, std::move(futureResource));
+                auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
                 return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.get<std::shared_future<const ResourceType&>>()};
             }
         }
@@ -226,9 +230,12 @@ namespace rex
                 auto loadFunction = sourceIterator->second.loadingFunction.get<LoadingFunction<ResourceType>>();
                 auto resource = loadFunction(sourceIterator->second.source, resourceId);
 
-                auto emplaced = mResources[sourceId].emplace(resourceId, std::move(resource));
+                {
+                    std::lock_guard<std::mutex> lock(mResourceMutex);
+                    auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
 
-                return emplaced.first->second.get<ResourceType>();
+                    return emplaced.first->second.get<ResourceType>();
+                }
             }
             catch(const std::exception& exception)
             {
@@ -242,6 +249,25 @@ namespace rex
     template <typename ResourceType>
     std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGetAll(const std::string& sourceId) const
     {
-        return {};
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
+                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
+
+            const auto& source = sourceIterator->second.source;
+
+            std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
+
+            std::vector<AsyncResourceView<ResourceType>> result;
+
+            for(const std::string& identifier : idList)
+                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
+
+            return result;
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 }
