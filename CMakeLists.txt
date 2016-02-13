@@ -6,6 +6,8 @@ if(NOT CMAKE_BUILD_TYPE )
 endif()
 
 set(BUNDLE_THERO FALSE CACHE BOOL "Will include the needed files from the thero support library. If not set, thero must be installed separately")
+set(INSTALL_SFML_LOADERS FALSE CACHE BOOL "Will include the resource loaders for SFML resources")
+set(INSTALL_FEATHERKIT_LOADERS FALSE CACHE BOOL "Will include the resource loaders for Feather Kit resources")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
@@ -21,6 +23,8 @@ set(header_files
     include/rex/assert.hpp
     include/rex/asyncresourceview.hpp
     include/rex/exceptions.hpp
+    include/rex/filesource.hpp
+    include/rex/filelister.hpp
     include/rex/resourceprovider.hpp
     include/rex/resourceview.hpp
     include/rex/sourceview.hpp
@@ -28,6 +32,7 @@ set(header_files
 
 include_directories("include")
 include_directories("thero/include")
+include_directories("tinydir")
 
 #tests
 if(BUILD_TESTS)
@@ -36,6 +41,8 @@ if(BUILD_TESTS)
         "tests/helpers/peoplesource.cpp"
         "tests/helpers/toolsource.cpp"
         "tests/resourceprovider.cpp"
+        "tests/filesource.cpp"
+        "tests/filelister.cpp"
         )
 
     set_property(TARGET tests PROPERTY CXX_STANDARD 14)

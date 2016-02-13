@@ -1,3 +1,6 @@
 [submodule "thero"]
 	path = thero
 	url = git@github.com:therocode/thero.git
+[submodule "tinydir"]
+	path = tinydir
+	url = git@github.com:cxong/tinydir.git
