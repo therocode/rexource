@@ -5,7 +5,8 @@ if(NOT CMAKE_BUILD_TYPE )
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Select if you want to build Debug or Release" FORCE )
 endif()
 
-set(BUNDLE_THERO FALSE CACHE BOOL "Will include the needed files from the thero support library. If not set, thero must be installed separately")
+set(BUNDLE_THERO TRUE CACHE BOOL "Will include the needed files from the thero support library. If not set, thero must be installed separately")
+set(BUNDLE_TINYDIR TRUE CACHE BOOL "Will include the needed files from the tinydir file library. If not set, tinydir must be installed separately")
 set(INSTALL_SFML_LOADERS FALSE CACHE BOOL "Will include the resource loaders for SFML resources")
 set(INSTALL_FEATHERKIT_LOADERS FALSE CACHE BOOL "Will include the resource loaders for Feather Kit resources")
 
@@ -19,8 +20,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)  #for static libs
 set(project_name rexources)
 project(${project_name} CXX)
 
+add_definitions("-DREX_DISABLE_CONFIG")
+
 set(header_files
     include/rex/assert.hpp
+    include/rex/config.hpp
     include/rex/asyncresourceview.hpp
     include/rex/exceptions.hpp
     include/rex/filesource.hpp
@@ -78,9 +82,40 @@ install(
     DESTINATION ${REX_MISC_DIR}
     )
 
+#thero
 if(BUNDLE_THERO)
     install(
         FILES thero/include/thero/optional.hpp thero/include/thero/any.hpp
-        DESTINATION ./include/thero/
+        DESTINATION ./include/rex/thero/
+        )
+    install(
+        FILES config/bundlethero.hpp
+        DESTINATION ./include/rex/config
+        RENAME thero.hpp
+        )
+else()
+    install(
+        FILES config/nobundlethero.hpp
+        DESTINATION ./include/rex/config
+        RENAME thero.hpp
+        )
+endif()
+
+#tinydir
+if(BUNDLE_TINYDIR)
+    install(
+        FILES tinydir/tinydir.h
+        DESTINATION ./include/rex/tinydir/
+        )
+    install(
+        FILES config/bundletinydir.hpp
+        DESTINATION ./include/rex/config
+        RENAME tinydir.hpp
+        )
+else()
+    install(
+        FILES config/nobundletinydir.hpp
+        DESTINATION ./include/rex/config
+        RENAME tinydir.hpp
         )
 endif()

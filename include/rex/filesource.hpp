@@ -1,4 +1,5 @@
 #pragma once
+#include <rex/config.hpp>
 #include <vector>
 #include <string>
 

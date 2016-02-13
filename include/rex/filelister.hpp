@@ -1,8 +1,14 @@
 #pragma once
+#include <rex/config.hpp>
 #include <vector>
 #include <string>
 #include <rex/exceptions.hpp>
+
+#ifdef REX_BUNDLE_TINYDIR
+#include <rex/tinydir/tinydir.h>
+#else
 #include <tinydir.h>
+#endif
 
 namespace rex
 {

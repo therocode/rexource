@@ -1,7 +1,14 @@
 #pragma once
+#include <rex/config.hpp>
 #include <mutex>
 #include <unordered_map>
+
+#ifdef REX_BUNDLE_THERO
+#include <rex/thero/any.hpp>
+#else
 #include <thero/any.hpp>
+#endif
+
 #include <rex/exceptions.hpp>
 #include <rex/sourceview.hpp>
 #include <rex/resourceview.hpp>
