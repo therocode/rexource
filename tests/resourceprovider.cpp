@@ -22,7 +22,7 @@ SCENARIO("ResourceProvider can manage sources")
 
         WHEN("a source is added")
         {
-            rex::SourceView<PeopleSource> added = provider.addSource("people", PeopleSource("data/people", false));
+            rex::SourceView<PeopleSource> added = provider.addSource("people", PeopleSource("tests/data/people", false));
 
             THEN("the return value's id is the added source's name")
             {
@@ -31,7 +31,7 @@ SCENARIO("ResourceProvider can manage sources")
 
             THEN("the return value's 'source' attribute is the source object instance")
             {
-                CHECK(added.source.path() == "data/people");
+                CHECK(added.source.path() == "tests/data/people");
             }
 
             THEN("accessing the source from the provider gives a view with same source id as when returned")
@@ -47,7 +47,7 @@ SCENARIO("ResourceProvider can manage sources")
 
         WHEN("a source is added and removed")
         {
-            provider.addSource("people", PeopleSource("data/people", false));
+            provider.addSource("people", PeopleSource("tests/data/people", false));
             bool removed = provider.removeSource("people");
 
             THEN("the function reports a removal")
@@ -75,8 +75,8 @@ SCENARIO("ResourceProvider can manage sources")
         {
             THEN("an exception is thrown")
             {
-                provider.addSource("people", PeopleSource("data/people", false));
-                CHECK_THROWS_AS(provider.addSource("people", PeopleSource("data/people", false)), rex::InvalidSourceException);
+                provider.addSource("people", PeopleSource("tests/data/people", false));
+                CHECK_THROWS_AS(provider.addSource("people", PeopleSource("tests/data/people", false)), rex::InvalidSourceException);
             }
         }
 
@@ -84,8 +84,8 @@ SCENARIO("ResourceProvider can manage sources")
         {
             THEN("exceptions are thrown")
             {
-                provider.addSource("people", PeopleSource("data/people", false));
-                provider.addSource("tools", ToolSource("data/tools"));
+                provider.addSource("people", PeopleSource("tests/data/people", false));
+                provider.addSource("tools", ToolSource("tests/data/tools"));
                 provider.clearSources();
 
                 CHECK_THROWS_AS(provider.source<PeopleSource>("people"), rex::InvalidSourceException);
@@ -101,7 +101,7 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
     {
         rex::ResourceProvider provider;
 
-        provider.addSource("people", PeopleSource("data/people", false));
+        provider.addSource("people", PeopleSource("tests/data/people", false));
 
         WHEN("valid resources are gotten")
         {
@@ -191,7 +191,7 @@ SCENARIO("ResourceProvider can be used to access resources asynchronously from s
     {
         rex::ResourceProvider provider;
 
-        provider.addSource("people", PeopleSource("data/people", true));
+        provider.addSource("people", PeopleSource("tests/data/people", true));
 
         WHEN("valid resources are accessed asynchronously")
         {
@@ -255,7 +255,7 @@ SCENARIO("ResourceProvider can be used to access the same resources synchronousl
     {
         rex::ResourceProvider provider;
 
-        provider.addSource("people", PeopleSource("data/people", true));
+        provider.addSource("people", PeopleSource("tests/data/people", true));
 
         WHEN("resources are accessed asynchronously after being accessed synchronously")
         {
@@ -304,7 +304,7 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
     {
         rex::ResourceProvider provider;
 
-        provider.addSource("people", PeopleSource("data/people", true));
+        provider.addSource("people", PeopleSource("tests/data/people", true));
 
         WHEN("all resources are accessed asynchronously")
         {

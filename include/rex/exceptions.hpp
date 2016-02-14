@@ -18,4 +18,9 @@ namespace rex
     {
         using std::runtime_error::runtime_error;
     };
+
+    class AmbiguousNameException : public std::runtime_error
+    {
+        using std::runtime_error::runtime_error;
+    };
 }

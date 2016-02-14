@@ -5,7 +5,7 @@ SCENARIO("File listers can be used to list all files in a folder recursively")
 {
     GIVEN("a file lister with a given directory path")
     {
-        rex::FileLister fileLister("data/folders");
+        rex::FileLister fileLister("tests/data/folders");
 
         WHEN("the lister is asked for a file list")
         {
@@ -17,14 +17,14 @@ SCENARIO("File listers can be used to list all files in a folder recursively")
 
                 std::set<std::string> fileSet(fileList.begin(), fileList.end());
 
-                CHECK(fileSet.count("data/folders/file1") != 0);
-                CHECK(fileSet.count("data/folders/file2") != 0);
-                CHECK(fileSet.count("data/folders/folder1/file1") != 0);
-                CHECK(fileSet.count("data/folders/folder2/folder1/folder1/file1") != 0);
-                CHECK(fileSet.count("data/folders/folder2/folder1/folder1/file2") != 0);
-                CHECK(fileSet.count("data/folders/folder3/folder1/file1") != 0);
-                CHECK(fileSet.count("data/folders/folder3/folder1/file2") != 0);
-                CHECK(fileSet.count("data/folders/folder3/file1") != 0);
+                CHECK(fileSet.count("tests/data/folders/file1") != 0);
+                CHECK(fileSet.count("tests/data/folders/file2") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder1/file1") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder2/folder1/folder1/file1") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder2/folder1/folder1/file2") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder3/folder1/file1") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder3/folder1/file2") != 0);
+                CHECK(fileSet.count("tests/data/folders/folder3/file1") != 0);
             }
         }
     }
@@ -35,7 +35,7 @@ SCENARIO("File listers can be used to list all files in a folder recursively")
         {
             THEN("an exception is thrown")
             {
-                CHECK_THROWS_AS(rex::FileLister("data/folders/file1"), rex::InvalidFileException);
+                CHECK_THROWS_AS(rex::FileLister("tests/data/folders/file1"), rex::InvalidFileException);
             }
         }
 
@@ -43,7 +43,7 @@ SCENARIO("File listers can be used to list all files in a folder recursively")
         {
             THEN("an exception is thrown")
             {
-                CHECK_THROWS_AS(rex::FileLister("data/floldrers"), rex::InvalidFileException);
+                CHECK_THROWS_AS(rex::FileLister("tests/data/floldrers"), rex::InvalidFileException);
             }
         }
     }
