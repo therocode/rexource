@@ -373,21 +373,3 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
         }
     }
 }
-
-SCENARIO("ResourceProvider can be used to access all resourceasasds from a source in an asynchronous way")
-{
-    GIVEN("a resource provider with a source added")
-    {
-        rex::ResourceProvider provider;
-
-        provider.addSource("trees", TreeFileSource("tests/data/trees"));
-
-        std::cout << "will load trees\n";
-        auto trees = provider.getAll<Tree>("trees");
-
-        std::cout << "trees size: " << trees.size() << "\n";
-
-        for(const auto& tree : trees)
-            std::cout << "tree: " << tree.identifier << ", " << tree.resource.leafType << ", " << tree.resource.barkType << ", " << tree.resource.height << ", " << tree.resource.branchingFactor << "\n";
-    }
-}

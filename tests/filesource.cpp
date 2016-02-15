@@ -1,9 +1,9 @@
 #include <catch.hpp>
 #include "helpers/treefilesource.hpp"
 
-SCENARIO("File loaders set to a folder with a regex will find files recursively with the regex as a filter")
+SCENARIO("File sources set to a folder with a regex will find files recursively with the regex as a filter")
 {
-    GIVEN("a file loader which is set to read all files in a directory")
+    GIVEN("a file source which is set to read all files in a directory")
     {
         TreeFileSource treeSource("tests/data/trees", std::regex(".*"));
 
@@ -27,7 +27,7 @@ SCENARIO("File loaders set to a folder with a regex will find files recursively 
         }
     }
 
-    GIVEN("a file loader which is set to read all files with a number in the 500s in a directory")
+    GIVEN("a file source which is set to read all files with a number in the 500s in a directory")
     {
         TreeFileSource treeSource("tests/data/trees", std::regex(".*5\\d\\d.*"));
 
@@ -51,7 +51,7 @@ SCENARIO("File loaders set to a folder with a regex will find files recursively 
         }
     }
 
-    GIVEN("a file loader which is not given a regex")
+    GIVEN("a file source which is not given a regex")
     {
         TreeFileSource treeSource("tests/data/trees");
 
@@ -75,7 +75,7 @@ SCENARIO("File loaders set to a folder with a regex will find files recursively 
         }
     }
 
-    GIVEN("a file loader which is set to read all files within a directory that doesn't exist")
+    GIVEN("a file source which is set to read all files within a directory that doesn't exist")
     {
         WHEN("all contained resurces are listed by the source")
         {
@@ -87,11 +87,11 @@ SCENARIO("File loaders set to a folder with a regex will find files recursively 
     }
 }
 
-SCENARIO("File loaders name resources differently based on the Naming flag. This affects ambiguity of resources")
+SCENARIO("File sources name resources differently based on the Naming flag. This affects ambiguity of resources")
 {
     GIVEN("")
     {
-        WHEN("a file loader is used to load a folder with entirely unique file names")
+        WHEN("a file source is used to load a folder with entirely unique file names")
         {
             THEN("it doesn't throw with Naming::NO_EXT")
             {
@@ -107,7 +107,7 @@ SCENARIO("File loaders name resources differently based on the Naming flag. This
             }
         }
 
-        WHEN("a file loader is used to load a folder with file names that collide with file extensions")
+        WHEN("a file source is used to load a folder with file names that collide with file extensions")
         {
             THEN("it throws with Naming::NO_EXT")
             {
@@ -123,7 +123,7 @@ SCENARIO("File loaders name resources differently based on the Naming flag. This
             }
         }
 
-        WHEN("a file loader is used to load a folder with file names that collide without file extensions")
+        WHEN("a file source is used to load a folder with file names that collide without file extensions")
         {
             THEN("it throws with Naming::NO_EXT")
             {
@@ -136,6 +136,33 @@ SCENARIO("File loaders name resources differently based on the Naming flag. This
             THEN("it doesn't throw with Naming::PATH")
             {
                 CHECK_NOTHROW(TreeFileSource("tests/data/collide_no_ext", std::regex(".*"), rex::Naming::PATH));
+            }
+        }
+    }
+}
+
+SCENARIO("a file source can be used to access the resources it represents")
+{
+    GIVEN("a file source setup to a directory with resources")
+    {
+        TreeFileSource treeSource("tests/data/trees");
+
+        WHEN("existing resources are accessed")
+        {
+            const Tree& tree1 = treeSource.load("tree1");
+            const Tree& tree2 = treeSource.load("tree2");
+
+            THEN("the resources have correct values")
+            {
+                CHECK(tree1.leafType == "gigantic");
+                CHECK(tree1.branchingFactor == Approx(65.7f));
+                CHECK(tree1.barkType == "naked");
+                CHECK(tree1.height == Approx(5.2f));
+
+                CHECK(tree2.leafType == "wide");
+                CHECK(tree2.branchingFactor == Approx(78.1f));
+                CHECK(tree2.barkType == "paper");
+                CHECK(tree2.height == Approx(43.2f));
             }
         }
     }
