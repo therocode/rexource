@@ -373,3 +373,61 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
         }
     }
 }
+
+SCENARIO("Resources in valid sources can be marked as unused")
+{
+    GIVEN("a resource provider with a source added and resources loaded")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("tests/data/people", false));
+        provider.get<Person>("people", "kalle");
+        provider.get<Person>("people", "anders");
+
+        WHEN("existing and non-existing resources are marked as unused in a valid source")
+        {
+            THEN("no exception is thrown")
+            {
+                CHECK_NOTHROW(provider.markUnused("people", "kalle"));
+                CHECK_NOTHROW(provider.markUnused("people", "anders"));
+                CHECK_NOTHROW(provider.markUnused("people", "asdfa"));
+            }
+        }
+
+        WHEN("resources are marked as unused in an invalid source")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.markUnused("tools", "hammer"), rex::InvalidSourceException);
+            }
+        }
+    }
+}
+
+SCENARIO("All resources in a source can be marked as invalid")
+{
+    GIVEN("a resource provider with a source added and resources loaded")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("tests/data/people", false));
+        provider.get<Person>("people", "kalle");
+        provider.get<Person>("people", "anders");
+
+        WHEN("all resources are marked as unused in a valid source")
+        {
+            THEN("no exception is thrown")
+            {
+                CHECK_NOTHROW(provider.markAllUnused("people"));
+            }
+        }
+
+        WHEN("all resources are marked as unused in an invalid source")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.markAllUnused("tools"), rex::InvalidSourceException);
+            }
+        }
+    }
+}

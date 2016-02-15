@@ -48,6 +48,9 @@ namespace rex
             AsyncResourceView<ResourceType> asyncGet(const std::string& sourceId, const std::string& resourceId) const;
             template <typename ResourceType>
             std::vector<AsyncResourceView<ResourceType>> asyncGetAll(const std::string& sourceId) const;
+            //free
+            void markUnused(const std::string& sourceId, const std::string& resourceId);
+            void markAllUnused(const std::string& sourceId);
         private:
             template <typename SourceType>
             SourceView<SourceType> sourceIteratorToView(std::unordered_map<std::string, SourceEntry>::const_iterator iterator) const;
@@ -107,22 +110,17 @@ namespace rex
 
     inline bool ResourceProvider::removeSource(const std::string& sourceId)
     {
-        return mSources.erase(sourceId) != 0;
-    }
+        mResources.erase(sourceId);
+        mAsyncProcesses.erase(sourceId);
 
-    template <typename SourceType>
-    SourceView<SourceType> ResourceProvider::sourceIteratorToView(std::unordered_map<std::string, SourceEntry>::const_iterator iterator) const
-    {
-        return SourceView<SourceType>
-        {
-            iterator->first,
-            iterator->second.source.get<SourceType>(),
-        };
+        return mSources.erase(sourceId) != 0;
     }
 
     inline void ResourceProvider::clearSources()
     {
         mSources.clear();
+        mResources.clear();
+        mAsyncProcesses.clear();
     }
 
     template <typename ResourceType>
@@ -192,6 +190,67 @@ namespace rex
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
+    template <typename ResourceType>
+    std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGetAll(const std::string& sourceId) const
+    {
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
+                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
+
+            const auto& source = sourceIterator->second.source;
+
+            std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
+
+            std::vector<AsyncResourceView<ResourceType>> result;
+
+            for(const std::string& identifier : idList)
+                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
+
+            return result;
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
+    void ResourceProvider::markUnused(const std::string& sourceId, const std::string& resourceId)
+    {
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            mResources.at(sourceId).erase(resourceId);
+            mAsyncProcesses.at(sourceId).erase(resourceId);
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
+    void ResourceProvider::markAllUnused(const std::string& sourceId)
+    {
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            mResources.at(sourceId).clear();
+            mAsyncProcesses.at(sourceId).clear();
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
+    template <typename SourceType>
+    SourceView<SourceType> ResourceProvider::sourceIteratorToView(std::unordered_map<std::string, SourceEntry>::const_iterator iterator) const
+    {
+        return SourceView<SourceType>
+        {
+            iterator->first,
+            iterator->second.source.get<SourceType>(),
+        };
+    }
+
     inline bool ResourceProvider::resourceReady(const std::string& sourceId, const std::string& resourceId) const
     {
         auto sourceIterator = mResources.find(sourceId);
@@ -235,31 +294,6 @@ namespace rex
             {
                 throw InvalidResourceException(exception.what());
             }
-        }
-        else
-            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
-    }
-
-    template <typename ResourceType>
-    std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGetAll(const std::string& sourceId) const
-    {
-        auto sourceIterator = mSources.find(sourceId);
-
-        if(sourceIterator != mSources.end())
-        {
-            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
-                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
-
-            const auto& source = sourceIterator->second.source;
-
-            std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
-
-            std::vector<AsyncResourceView<ResourceType>> result;
-
-            for(const std::string& identifier : idList)
-                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
-
-            return result;
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
