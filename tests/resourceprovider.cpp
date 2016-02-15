@@ -138,11 +138,38 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
             }
         }
 
+        WHEN("more than one valid resource are gotten")
+        {
+            std::vector<rex::ResourceView<Person>> people = provider.get<Person>("people", std::vector<std::string>{"anders", "torsten"});
+
+            REQUIRE(people.size() == 2);
+
+            std::map<std::string, int32_t> peopleSorted =
+            {
+                {people[0].resource.name, people[0].resource.age},
+                {people[1].resource.name, people[1].resource.age},
+            };
+
+            REQUIRE(peopleSorted.size() == 2);
+
+            auto iter = peopleSorted.begin();
+            CHECK(iter->first == "anders");
+            CHECK(iter->second == 47);
+            ++iter;
+            CHECK(iter->first == "torsten");
+            CHECK(iter->second == 94);
+        }
+
         WHEN("invalid resources are gotten")
         {
             THEN("an exception is thrown")
             {
-                CHECK_THROWS_AS(provider.get<Person>("people", "ragnar"), rex::InvalidResourceException);
+                CHECK_THROWS_AS(provider.get<Person>("people", "asdf"), rex::InvalidResourceException);
+            }
+
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.get<Person>("people", std::vector<std::string>{"anders", "asdf"}), rex::InvalidResourceException);
             }
         }
 
@@ -237,13 +264,49 @@ SCENARIO("ResourceProvider can be used to access resources asynchronously from s
             }
         }
 
-        WHEN("invalid resources are accessed asynchronously")
+        WHEN("more than one valid resource are accessed asynchronously")
         {
-            rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "stellan");
+            std::vector<rex::AsyncResourceView<Person>> persons = provider.asyncGet<Person>("people", std::vector<std::string>{"anders", "kalle"});
 
             THEN("initially the name is correct and the value is a waiting std::future")
             {
-                CHECK(personView.identifier == "stellan");
+                bool valid1 = persons[0].identifier == "anders" || persons[0].identifier == "kalle";
+                bool valid2 = persons[1].identifier == "anders" || persons[1].identifier == "kalle";
+
+                CHECK(valid1);
+                CHECK(valid2);
+                CHECK(persons[0].identifier != persons[1].identifier);
+            }
+
+            THEN("when the async accesses are resolved, the contained resources have correct values")
+            {
+                REQUIRE(persons[0].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+                REQUIRE(persons[1].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+
+                std::map<std::string, int32_t> peopleSorted =
+                {
+                    {persons[0].future.get().name, persons[0].future.get().age},
+                    {persons[1].future.get().name, persons[1].future.get().age},
+                };
+                
+                REQUIRE(peopleSorted.size() == 2);
+
+                auto iter = peopleSorted.begin();
+                CHECK(iter->first == "anders");
+                CHECK(iter->second == 47);
+                ++iter;
+                CHECK(iter->first == "kalle");
+                CHECK(iter->second == 19);
+            }
+        }
+
+        WHEN("invalid resources are accessed asynchronously")
+        {
+            rex::AsyncResourceView<Person> personView = provider.asyncGet<Person>("people", "asdf");
+
+            THEN("initially the name is correct and the value is a waiting std::future")
+            {
+                CHECK(personView.identifier == "asdf");
                 CHECK(personView.future.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout);
             }
 
@@ -252,6 +315,30 @@ SCENARIO("ResourceProvider can be used to access resources asynchronously from s
                 REQUIRE(personView.future.wait_for(std::chrono::milliseconds(150)) == std::future_status::ready);
 
                 CHECK_THROWS_AS(personView.future.get(), rex::InvalidResourceException);
+            }
+        }
+
+        WHEN("many resources are accessed asynchronously and at least one is invalid")
+        {
+            std::vector<rex::AsyncResourceView<Person>> people = provider.asyncGet<Person>("people", std::vector<std::string>{"kalle", "asdf"});
+
+            REQUIRE(people[0].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+            REQUIRE(people[1].future.wait_for(std::chrono::milliseconds(200)) == std::future_status::ready);
+
+            THEN("when the resources are finished loading, the valid resource can be accessed normally and the other one throws an exception")
+            {
+                std::map<std::string, std::shared_future<const Person&>> sorted
+                {
+                    { people[0].identifier, people[0].future },
+                    { people[1].identifier, people[1].future },
+                };
+
+                auto kalle = sorted.at("kalle");
+                auto invalid = sorted.at("asdf");
+
+                CHECK(kalle.get().name == "kalle");
+                CHECK(kalle.get().age == 19);
+                CHECK_THROWS_AS(invalid.get(), rex::InvalidResourceException);
             }
         }
 

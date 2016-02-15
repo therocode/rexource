@@ -43,10 +43,14 @@ namespace rex
             template <typename ResourceType>
             const ResourceType& get(const std::string& sourceId, const std::string& resourceId) const;
             template <typename ResourceType>
+            std::vector<ResourceView<ResourceType>> get(const std::string& sourceId, const std::vector<std::string>& resourceIds) const;
+            template <typename ResourceType>
             std::vector<ResourceView<ResourceType>> getAll(const std::string& sourceId) const;
             //async get
             template <typename ResourceType>
             AsyncResourceView<ResourceType> asyncGet(const std::string& sourceId, const std::string& resourceId) const;
+            template <typename ResourceType>
+            std::vector<AsyncResourceView<ResourceType>> asyncGet(const std::string& sourceId, const std::vector<std::string>& resourceIds) const;
             template <typename ResourceType>
             std::vector<AsyncResourceView<ResourceType>> asyncGetAll(const std::string& sourceId) const;
             //free
@@ -163,6 +167,20 @@ namespace rex
     }
 
     template <typename ResourceType>
+    std::vector<ResourceView<ResourceType>> ResourceProvider::get(const std::string& sourceId, const std::vector<std::string>& resourceIds) const
+    {
+        std::vector<AsyncResourceView<ResourceType>> asyncViews = asyncGet<ResourceType>(sourceId, resourceIds);
+        std::vector<ResourceView<ResourceType>> result;
+
+        for(auto& asyncView : asyncViews)
+        {
+            result.emplace_back(ResourceView<ResourceType>{asyncView.identifier, asyncView.future.get()});
+        }
+
+        return result;
+    }
+
+    template <typename ResourceType>
     std::vector<ResourceView<ResourceType>> ResourceProvider::getAll(const std::string& sourceId) const
     {
         std::vector<AsyncResourceView<ResourceType>> asyncViews = asyncGetAll<ResourceType>(sourceId);
@@ -194,8 +212,31 @@ namespace rex
             {
                 std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
                 auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
-                return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.get<std::shared_future<const ResourceType&>>()};
+                return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
             }
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
+    template <typename ResourceType>
+    std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGet(const std::string& sourceId, const std::vector<std::string>& resourceIds) const
+    {
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
+                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
+
+            const auto& source = sourceIterator->second.source;
+
+            std::vector<AsyncResourceView<ResourceType>> result;
+
+            for(const std::string& identifier : resourceIds)
+                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
+
+            return result;
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -215,12 +256,7 @@ namespace rex
 
             std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
 
-            std::vector<AsyncResourceView<ResourceType>> result;
-
-            for(const std::string& identifier : idList)
-                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
-
-            return result;
+            return asyncGet<ResourceType>(sourceId, idList);
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -298,7 +334,7 @@ namespace rex
                     std::lock_guard<std::mutex> lock(mResourceMutex);
                     auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
 
-                    return emplaced.first->second.get<ResourceType>();
+                    return emplaced.first->second.template get<ResourceType>();
                 }
             }
             catch(const std::exception& exception)
