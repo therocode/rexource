@@ -3,11 +3,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#ifdef REX_BUNDLE_THERO
-#include <rex/thero/any.hpp>
-#else
-#include <thero/any.hpp>
-#endif
+#include <rex/thero.hpp>
 
 #include <rex/exceptions.hpp>
 #include <rex/sourceview.hpp>

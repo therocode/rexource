@@ -34,6 +34,8 @@ set(header_files
     include/rex/resourceprovider.hpp
     include/rex/resourceview.hpp
     include/rex/sourceview.hpp
+    include/rex/thero.hpp
+    include/rex/tinydir.hpp
 )
 
 include_directories("include")
