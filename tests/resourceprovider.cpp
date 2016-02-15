@@ -47,6 +47,28 @@ SCENARIO("ResourceProvider can manage sources")
             }
         }
 
+        WHEN("two sources are added and listed")
+        {
+            provider.addSource("people", PeopleSource("tests/data/people", false));
+            provider.addSource("tools", ToolSource("tests/data/tools"));
+
+            std::vector<std::string> sources = provider.sources();
+
+            THEN("the list contains the sources added before")
+            {
+                std::set<std::string> ordered
+                {
+                    sources[0],
+                    sources[1],
+                };
+
+                REQUIRE(sources.size() == 2);
+                CHECK(ordered.count("people") == 1);
+                CHECK(ordered.count("tools") == 1);
+            }
+
+        }
+
         WHEN("a source is added and removed")
         {
             provider.addSource("people", PeopleSource("tests/data/people", false));

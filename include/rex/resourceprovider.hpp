@@ -36,6 +36,7 @@ namespace rex
             SourceView<SourceType> source(const std::string& sourceId) const;
             template <typename SourceType>
             SourceView<SourceType> addSource(const std::string& sourceId, SourceType source);
+            std::vector<std::string> sources() const;
             bool removeSource(const std::string& sourceId);
             void clearSources();
             //sync get
@@ -106,6 +107,16 @@ namespace rex
             return sourceIteratorToView<SourceType>(added.first);
         else
             throw InvalidSourceException("adding source id " + sourceId + " which is already added");
+    }
+
+    inline std::vector<std::string> ResourceProvider::sources() const
+    {
+        std::vector<std::string> result;
+
+        for(const auto& source : mSources)
+           result.push_back(source.first); 
+
+        return result;
     }
 
     inline bool ResourceProvider::removeSource(const std::string& sourceId)
