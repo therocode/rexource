@@ -5,8 +5,9 @@ if(NOT CMAKE_BUILD_TYPE )
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Select if you want to build Debug or Release" FORCE )
 endif()
 
-set(BUNDLE_THERO TRUE CACHE BOOL "Will include the needed files from the thero support library. If not set, thero must be installed separately")
-set(BUNDLE_TINYDIR TRUE CACHE BOOL "Will include the needed files from the tinydir file library. If not set, tinydir must be installed separately")
+set(BUNDLE_THERO TRUE CACHE BOOL "Will include the needed files from the thero support library. If not set, it must be installed separately")
+set(BUNDLE_TINYDIR TRUE CACHE BOOL "Will include the needed files from the tinydir file library. If not set, it must be installed separately")
+set(BUNDLE_JSON TRUE CACHE BOOL "Will include the needed files from the nlohmann json library. If not set, it must be installed separately")
 set(INSTALL_SFML_LOADERS FALSE CACHE BOOL "Will include the resource loaders for SFML resources")
 set(INSTALL_FEATHERKIT_LOADERS FALSE CACHE BOOL "Will include the resource loaders for Feather Kit resources")
 
@@ -24,11 +25,12 @@ add_definitions("-DREX_DISABLE_CONFIG")
 
 set(header_files
     include/rex/assert.hpp
-    include/rex/config.hpp
     include/rex/asyncresourceview.hpp
+    include/rex/config.hpp
     include/rex/exceptions.hpp
     include/rex/filesource.hpp
     include/rex/filelister.hpp
+    include/rex/json.hpp
     include/rex/resourceprovider.hpp
     include/rex/resourceview.hpp
     include/rex/sourceview.hpp
@@ -37,6 +39,7 @@ set(header_files
 include_directories("include")
 include_directories("thero/include")
 include_directories("tinydir")
+include_directories("json/src")
 
 #tests
 if(BUILD_TESTS)
@@ -117,5 +120,24 @@ else()
         FILES config/nobundletinydir.hpp
         DESTINATION ./include/rex/config
         RENAME tinydir.hpp
+        )
+endif()
+
+#json
+if(BUNDLE_JSON)
+    install(
+        FILES json/src/json.hpp
+        DESTINATION ./include/rex/json
+        )
+    install(
+        FILES config/bundlejson.hpp
+        DESTINATION ./include/rex/config
+        RENAME json.hpp
+        )
+else()
+    install(
+        FILES config/nobundlejson.hpp
+        DESTINATION ./include/rex/config
+        RENAME json.hpp
         )
 endif()

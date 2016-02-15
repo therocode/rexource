@@ -4,3 +4,6 @@
 [submodule "tinydir"]
 	path = tinydir
 	url = git@github.com:cxong/tinydir.git
+[submodule "json"]
+	path = json
+	url = git@github.com:nlohmann/json.git
