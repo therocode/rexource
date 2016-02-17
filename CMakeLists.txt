@@ -57,6 +57,7 @@ if(BUILD_TESTS)
         "tests/onloaded.cpp"
         "tests/progresstracker.cpp"
         "tests/resourceprovider.cpp"
+        "tests/threadpool.cpp"
         )
 
     set_property(TARGET tests PROPERTY CXX_STANDARD 14)

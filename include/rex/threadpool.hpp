@@ -23,7 +23,7 @@ namespace rex
     public:
         ThreadPool(size_t threadCount);
         template<class Task, class... Args>
-        std::future<typename std::result_of<Task(Args...)>::type> enqueue(Task&& task, int32_t priority, Args&&... args);
+        std::future<typename std::result_of<Task(Args...)>::type> enqueue(Task&& task, int32_t priority = 0, Args&&... args);
         std::vector<std::thread::id> getThreadIds();
         ~ThreadPool();
     private:
