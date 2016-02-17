@@ -5,10 +5,11 @@
 
 #include <rex/thero.hpp>
 
-#include <rex/exceptions.hpp>
-#include <rex/sourceview.hpp>
-#include <rex/resourceview.hpp>
 #include <rex/asyncresourceview.hpp>
+#include <rex/exceptions.hpp>
+#include <rex/resourceview.hpp>
+#include <rex/sourceview.hpp>
+#include <rex/threadpool.hpp>
 
 namespace rex
 {
@@ -27,6 +28,7 @@ namespace rex
         };
 
         public:
+            ResourceProvider(int32_t workerCount = 10);
             //sources
             template <typename SourceType>
             SourceView<SourceType> source(const std::string& sourceId) const;
@@ -63,7 +65,13 @@ namespace rex
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mResources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mAsyncProcesses;
             mutable std::mutex mResourceMutex;
+            mutable ThreadPool mThreadPool;
     };
+
+    inline ResourceProvider::ResourceProvider(int32_t workerCount):
+        mThreadPool(workerCount)
+    {
+    }
 
     template <typename SourceType>
     SourceView<SourceType> ResourceProvider::source(const std::string& sourceId) const
@@ -206,7 +214,10 @@ namespace rex
             }
             else
             {
-                std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                //std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                //std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
                 auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
                 return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
             }
@@ -258,7 +269,7 @@ namespace rex
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
-    void ResourceProvider::markUnused(const std::string& sourceId, const std::string& resourceId)
+    inline void ResourceProvider::markUnused(const std::string& sourceId, const std::string& resourceId)
     {
         auto sourceIterator = mSources.find(sourceId);
 
@@ -271,7 +282,7 @@ namespace rex
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
-    void ResourceProvider::markAllUnused(const std::string& sourceId)
+    inline void ResourceProvider::markAllUnused(const std::string& sourceId)
     {
         auto sourceIterator = mSources.find(sourceId);
 
