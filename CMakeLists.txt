@@ -31,10 +31,13 @@ set(header_files
     include/rex/filesource.hpp
     include/rex/filelister.hpp
     include/rex/json.hpp
+    include/rex/onloaded.hpp
+    include/rex/progresstracker.hpp
     include/rex/resourceprovider.hpp
     include/rex/resourceview.hpp
     include/rex/sourceview.hpp
     include/rex/thero.hpp
+    include/rex/threadpool.hpp
     include/rex/tinydir.hpp
 )
 
@@ -49,9 +52,11 @@ if(BUILD_TESTS)
     add_executable(tests "tests/main.cpp"
         "tests/helpers/peoplesource.cpp"
         "tests/helpers/toolsource.cpp"
-        "tests/resourceprovider.cpp"
         "tests/filesource.cpp"
         "tests/filelister.cpp"
+        "tests/onloaded.cpp"
+        "tests/progresstracker.cpp"
+        "tests/resourceprovider.cpp"
         )
 
     set_property(TARGET tests PROPERTY CXX_STANDARD 14)
