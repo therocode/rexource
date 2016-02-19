@@ -119,6 +119,41 @@ SCENARIO("ResourceProvider can manage sources")
     }
 }
 
+SCENARIO("ResourceProvider can be used to list available resources in a source")
+{
+    GIVEN("a resource provider with a source added")
+    {
+        rex::ResourceProvider provider;
+
+        provider.addSource("people", PeopleSource("tests/data/people", false));
+        
+        WHEN("the provider is asked to list all resources within the source")
+        {
+            std::vector<std::string> list = provider.list("people");
+
+            std::set<std::string> sortedList =
+            {
+                {list[0]},
+                {list[1]},
+                {list[2]},
+            };
+
+            CHECK(sortedList.size() == 3);
+            CHECK(sortedList.count("kalle") != 0);
+            CHECK(sortedList.count("anders") != 0);
+            CHECK(sortedList.count("torsten") != 0);
+        }
+
+        WHEN("resources are listed from an invalid source")
+        {
+            THEN("an exception is thrown")
+            {
+                CHECK_THROWS_AS(provider.list("tools"), rex::InvalidSourceException);
+            }
+        }
+    }
+}
+
 SCENARIO("ResourceProvider can be used to access resources synchronously from sources")
 {
     GIVEN("a resource provider with a source added")

@@ -37,6 +37,8 @@ namespace rex
             std::vector<std::string> sources() const;
             bool removeSource(const std::string& sourceId);
             void clearSources();
+            //list
+            std::vector<std::string> list(const std::string& sourceId) const;
             //sync get
             template <typename ResourceType>
             const ResourceType& get(const std::string& sourceId, const std::string& resourceId) const;
@@ -142,6 +144,20 @@ namespace rex
         mAsyncProcesses.clear();
     }
 
+    inline std::vector<std::string> ResourceProvider::list(const std::string& sourceId) const
+    {
+        auto sourceIterator = mSources.find(sourceId);
+
+        if(sourceIterator != mSources.end())
+        {
+            const auto& source = sourceIterator->second.source;
+
+            return sourceIterator->second.listingFunction(source);
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+    }
+
     template <typename ResourceType>
     const ResourceType& ResourceProvider::get(const std::string& sourceId, const std::string& resourceId) const
     {
@@ -173,15 +189,29 @@ namespace rex
     template <typename ResourceType>
     std::vector<ResourceView<ResourceType>> ResourceProvider::get(const std::string& sourceId, const std::vector<std::string>& resourceIds) const
     {
-        std::vector<AsyncResourceView<ResourceType>> asyncViews = asyncGet<ResourceType>(sourceId, resourceIds);
-        std::vector<ResourceView<ResourceType>> result;
+        auto sourceIterator = mSources.find(sourceId);
 
-        for(auto& asyncView : asyncViews)
+        if(sourceIterator != mSources.end())
         {
-            result.emplace_back(ResourceView<ResourceType>{asyncView.identifier, asyncView.future.get()});
-        }
+            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
+                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
 
-        return result;
+            if(resourceLoadInitiated(sourceId, resourceId))
+            {
+                auto& future = mAsyncProcesses.at(sourceId).at(resourceId).get<std::shared_future<const ResourceType&>>();
+                future.wait();
+                return future.get();
+            }
+            else
+            {
+                auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
+                auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
+                return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
+            }
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
     template <typename ResourceType>
@@ -215,8 +245,6 @@ namespace rex
             else
             {
                 auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
-                //std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
-                //std::shared_future<const ResourceType&> futureResource = std::async(std::launch::async, &ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
                 std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
                 auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
                 return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
