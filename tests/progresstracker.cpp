@@ -14,7 +14,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
 
         WHEN("a ProgressTracker is created out of an async loading process from the ResourceProvider")
         {
-            rex::ProgressTracker<Tree> tracker(provider.asyncGetAll<Tree>("trees"));
+            rex::ProgressTracker tracker(provider.asyncGetAll<Tree>("trees"));
 
             THEN("the tracker reports the correct total amount")
             {
@@ -31,7 +31,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
 
                 while(lastDoneRatio < 1.0f)
                 {
-                    rex::ProgressTracker<Tree>::Status status = tracker.status();
+                    rex::ProgressTracker::Status status = tracker.status();
 
                     int32_t newDone = status.done();
                     int32_t newWaiting = status.waiting();
@@ -56,7 +56,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
                     lastWaitingRatio = newWaitingRatio;
                 }
 
-                rex::ProgressTracker<Tree>::Status status = tracker.status();
+                rex::ProgressTracker::Status status = tracker.status();
 
                 CHECK(lastDone == 1000);
                 CHECK(lastWaiting == 0);
@@ -69,7 +69,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
 
         WHEN("a ProgressTracker is created out of an async loading process from the ResourceProvider, containing some invalid entries")
         {
-            rex::ProgressTracker<Tree> tracker(provider.asyncGet<Tree>("trees", {"tree1", "tree2", "blah", "tree3", "bloh", "blih", "tree4", "bleh"}));
+            rex::ProgressTracker tracker(provider.asyncGet<Tree>("trees", {"tree1", "tree2", "blah", "tree3", "bloh", "blih", "tree4", "bleh"}));
 
             THEN("the tracker reports the correct total amount")
             {
@@ -88,7 +88,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
 
                 while(lastWaitingRatio > 0.0f)
                 {
-                    rex::ProgressTracker<Tree>::Status status = tracker.status();
+                    rex::ProgressTracker::Status status = tracker.status();
 
                     int32_t newDone = status.done();
                     int32_t newWaiting = status.waiting();

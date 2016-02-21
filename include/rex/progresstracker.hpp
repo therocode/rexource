@@ -1,10 +1,10 @@
 #pragma once
 #include <vector>
+#include <rex/thero.hpp>
 #include <rex/asyncresourceview.hpp>
 
 namespace rex
 {
-    template <typename ResourceType>
     class ProgressTracker
     {
         public:
@@ -30,15 +30,17 @@ namespace rex
                     float mFailedRatio;
             };
 
+            template <typename ResourceType>
             ProgressTracker(std::vector<AsyncResourceView<ResourceType>> toTrack);
             int32_t total() const;
             Status status() const;
         private:
-            std::vector<AsyncResourceView<ResourceType>> mToTrack;
+            int32_t mTotal;
+            th::Any mToTrack;
+            Status (*mStatusGetter)(const th::Any&);
     };
 
-    template <typename ResourceType>
-    ProgressTracker<ResourceType>::Status::Status(int32_t waiting, int32_t done, int32_t failed):
+    inline ProgressTracker::Status::Status(int32_t waiting, int32_t done, int32_t failed):
         mTotal(waiting + done + failed),
         mWaiting(waiting),
         mDone(done),
@@ -49,50 +51,42 @@ namespace rex
     {
     }
 
-    template <typename ResourceType>
-    int32_t ProgressTracker<ResourceType>::Status::total() const
+    inline int32_t ProgressTracker::Status::total() const
     {
         return mTotal;
     }
 
-    template <typename ResourceType>
-    int32_t ProgressTracker<ResourceType>::Status::waiting() const
+    inline int32_t ProgressTracker::Status::waiting() const
     {
         return mWaiting;
     }
 
-    template <typename ResourceType>
-    int32_t ProgressTracker<ResourceType>::Status::done() const
+    inline int32_t ProgressTracker::Status::done() const
     {
         return mDone;
     }
 
-    template <typename ResourceType>
-    int32_t ProgressTracker<ResourceType>::Status::failed() const
+    inline int32_t ProgressTracker::Status::failed() const
     {
         return mFailed;
     }
 
-    template <typename ResourceType>
-    float ProgressTracker<ResourceType>::Status::waitingRatio() const
+    inline float ProgressTracker::Status::waitingRatio() const
     {
         return mWaitingRatio;
     }
 
-    template <typename ResourceType>
-    float ProgressTracker<ResourceType>::Status::doneRatio() const
+    inline float ProgressTracker::Status::doneRatio() const
     {
         return mDoneRatio;
     }
 
-    template <typename ResourceType>
-    float ProgressTracker<ResourceType>::Status::failedRatio() const
+    inline float ProgressTracker::Status::failedRatio() const
     {
         return mFailedRatio;
     }
 
-    template <typename ResourceType>
-    float ProgressTracker<ResourceType>::Status::toRatio(int32_t amount) const
+    inline float ProgressTracker::Status::toRatio(int32_t amount) const
     {
         if(amount == 0)
             return 0.0f;
@@ -103,47 +97,52 @@ namespace rex
     }
 
     template <typename ResourceType>
-    ProgressTracker<ResourceType>::ProgressTracker(std::vector<AsyncResourceView<ResourceType>> toTrack):
+    ProgressTracker::ProgressTracker(std::vector<AsyncResourceView<ResourceType>> toTrack):
+        mTotal(toTrack.size()),
         mToTrack(std::move(toTrack))
     {
-    }
-
-    template <typename ResourceType>
-    int32_t ProgressTracker<ResourceType>::total() const
-    {
-        return static_cast<int32_t>(mToTrack.size());
-    }
-
-    template <typename ResourceType>
-    typename ProgressTracker<ResourceType>::Status ProgressTracker<ResourceType>::status() const
-    {
-        int32_t waiting = 0;
-        int32_t done = 0;
-        int32_t failed = 0;
-
-        for(const auto& view : mToTrack)
+        mStatusGetter = [] (const th::Any& trackedAny)
         {
-            auto futureStatus = view.future.wait_for(std::chrono::milliseconds(0));
-            if(futureStatus == std::future_status::timeout)
-                ++waiting;
-            else if(futureStatus == std::future_status::ready)
+            const auto& tracked = trackedAny.get<std::vector<AsyncResourceView<ResourceType>>>();
+
+            int32_t waiting = 0;
+            int32_t done = 0;
+            int32_t failed = 0;
+
+            for(const auto& view : tracked)
             {
-                try
+                auto futureStatus = view.future.wait_for(std::chrono::milliseconds(0));
+                if(futureStatus == std::future_status::timeout)
+                    ++waiting;
+                else if(futureStatus == std::future_status::ready)
                 {
-                    view.future.get();
-                    ++done;
-                }
-                catch(...)
-                {
-                    ++failed;
+                    try
+                    {
+                        view.future.get();
+                        ++done;
+                    }
+                    catch(...)
+                    {
+                        ++failed;
+                    }
                 }
             }
-        }
 
-        return Status(
-            waiting,
-            done,
-            failed
-        );
+            return Status(
+                waiting,
+                done,
+                failed
+            );
+        };
+    }
+
+    inline int32_t ProgressTracker::total() const
+    {
+        return mTotal;
+    }
+
+    inline ProgressTracker::Status ProgressTracker::status() const
+    {
+        return mStatusGetter(mToTrack);
     }
 }

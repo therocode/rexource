@@ -29,7 +29,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
 
             THEN("eventually, the callback is run for every object")
             {
-                auto tracker = rex::ProgressTracker<Tree>(asyncResources);
+                auto tracker = rex::ProgressTracker(asyncResources);
 
                 size_t lastSize = loadedTreeIds.size();
 
@@ -66,7 +66,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
 
             THEN("eventually, the callback is run for every successful object only")
             {
-                auto tracker = rex::ProgressTracker<Tree>(asyncResources);
+                auto tracker = rex::ProgressTracker(asyncResources);
 
                 size_t lastSize = loadedTreeIds.size();
 
