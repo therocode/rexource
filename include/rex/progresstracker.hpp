@@ -34,11 +34,7 @@ namespace rex
             int32_t total() const;
             Status status() const;
         private:
-            void updateValues() const;
             std::vector<AsyncResourceView<ResourceType>> mToTrack;
-            mutable int32_t mDoneCount;
-            mutable int32_t mWaitingCount;
-            mutable int32_t mFailedCount;
     };
 
     template <typename ResourceType>
@@ -108,10 +104,7 @@ namespace rex
 
     template <typename ResourceType>
     ProgressTracker<ResourceType>::ProgressTracker(std::vector<AsyncResourceView<ResourceType>> toTrack):
-        mToTrack(std::move(toTrack)),
-        mDoneCount(0),
-        mWaitingCount(0),
-        mFailedCount(0)
+        mToTrack(std::move(toTrack))
     {
     }
 
@@ -124,22 +117,9 @@ namespace rex
     template <typename ResourceType>
     typename ProgressTracker<ResourceType>::Status ProgressTracker<ResourceType>::status() const
     {
-        updateValues();
-
-        return Status(
-            mWaitingCount,
-            mDoneCount,
-            mFailedCount
-        );
-    }
-
-    template <typename ResourceType>
-    void ProgressTracker<ResourceType>::updateValues() const
-    {
         int32_t waiting = 0;
         int32_t done = 0;
         int32_t failed = 0;
-
 
         for(const auto& view : mToTrack)
         {
@@ -160,8 +140,10 @@ namespace rex
             }
         }
 
-        mWaitingCount = waiting;
-        mDoneCount = done;
-        mFailedCount = failed;
+        return Status(
+            waiting,
+            done,
+            failed
+        );
     }
 }
