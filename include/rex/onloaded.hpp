@@ -4,28 +4,57 @@
 
 namespace rex
 {
-    template <typename ResourceType>
     class OnLoaded
     {
         public:
-            OnLoaded(std::vector<AsyncResourceView<ResourceType>> toTrack, std::function<void(const std::string&, const ResourceType&)> callback);
+            template <typename ResourceType>
+            OnLoaded(std::vector<AsyncResourceView<ResourceType>> toTrack, std::function<void(const std::string&, const decltype(toTrack[0].future.get())&)> callback);
             void poll();
         private:
-            std::vector<AsyncResourceView<ResourceType>> mToTrack;
             std::vector<bool> mDoneEntries;
-            std::function<void(const std::string&, const ResourceType&)> mCallback;
+            th::Any mToTrack;
+            th::Any mCallback;
+
+            bool (*mEntryReady)(const th::Any& trackedAny, size_t index);
+            void (*mExecuteCallback)(const th::Any& trackedAny, size_t index, const th::Any& callbackAny);
     };
 
     template <typename ResourceType>
-    OnLoaded<ResourceType>::OnLoaded(std::vector<AsyncResourceView<ResourceType>> toTrack, std::function<void(const std::string&, const ResourceType&)> callback):
+    OnLoaded::OnLoaded(std::vector<AsyncResourceView<ResourceType>> toTrack, std::function<void(const std::string&, const decltype(toTrack[0].future.get())&)> callback):
+        mDoneEntries(toTrack.size(), false),
         mToTrack(std::move(toTrack)),
-        mDoneEntries(mToTrack.size(), false),
         mCallback(std::move(callback))
     {
+        mEntryReady = [] (const th::Any& trackedAny, size_t index)
+        {
+            const auto& tracked = trackedAny.get<std::vector<AsyncResourceView<ResourceType>>>();
+
+            return tracked[index].future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+        };
+
+        mExecuteCallback = [] (const th::Any& trackedAny, size_t index, const th::Any& callbackAny)
+        {
+            const auto& tracked = trackedAny.get<std::vector<AsyncResourceView<ResourceType>>>();
+            const auto& callback = callbackAny.get<std::function<void(const std::string&, const ResourceType&)>>();
+
+            const ResourceType* resource = nullptr;
+
+            try
+            {
+                resource = &tracked[index].future.get();
+            }
+            catch(...)
+            {
+            }
+
+            if(resource)
+            {
+                callback(tracked[index].identifier, *resource);
+            }
+        };
     }
 
-    template <typename ResourceType>
-    void OnLoaded<ResourceType>::poll()
+    inline void OnLoaded::poll()
     {
         for(size_t i = 0; i < mDoneEntries.size(); ++i)
         {
@@ -33,18 +62,11 @@ namespace rex
 
             if(!entryDone)
             {
-                auto& entry = mToTrack[i];
-                if(entry.future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready)
+                if(mEntryReady(mToTrack, i))
                 {
-                    try
-                    {
-                        mCallback(entry.identifier, entry.future.get());
-                    }
-                    catch(...)
-                    {
-                    }
-
                     mDoneEntries[i] = true;
+
+                    mExecuteCallback(mToTrack, i, mCallback);
                 }
             }
         }

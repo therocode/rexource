@@ -18,7 +18,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
             std::vector<rex::AsyncResourceView<Tree>> asyncResources = provider.asyncGetAll<Tree>("trees");
 
             std::set<int32_t> loadedTreeIds;
-            rex::OnLoaded<Tree> onLoaded(asyncResources, [&loadedTreeIds] (const std::string& identifier, const Tree& loadedResource)
+            rex::OnLoaded onLoaded(asyncResources, [&loadedTreeIds] (const std::string& identifier, const Tree& loadedResource)
             {
                 size_t numberStartAt = identifier.find_first_of("1234567890");
                 std::string startsWithNumber = identifier.substr(numberStartAt);
@@ -55,7 +55,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
             std::vector<rex::AsyncResourceView<Tree>> asyncResources = provider.asyncGet<Tree>("trees", {"tree1", "asdf", "tree2", "blah", "tree3", "gropp"});
 
             std::set<int32_t> loadedTreeIds;
-            rex::OnLoaded<Tree> onLoaded(asyncResources, [&loadedTreeIds] (const std::string& identifier, const Tree& loadedResource)
+            rex::OnLoaded onLoaded(asyncResources, [&loadedTreeIds] (const std::string& identifier, const Tree& loadedResource)
             {
                 size_t numberStartAt = identifier.find_first_of("1234567890");
                 std::string startsWithNumber = identifier.substr(numberStartAt);
