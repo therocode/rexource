@@ -4,6 +4,7 @@
 
 #include "helpers/treefilesource.hpp"
 
+#ifndef REX_DISABLE_ASYNC
 SCENARIO("ProgressTracker can tell the current progress of an async loading process")
 {
     GIVEN("a resource provider with a source set up")
@@ -124,3 +125,4 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
         }
     }
 }
+#endif

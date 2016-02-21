@@ -271,6 +271,7 @@ SCENARIO("ResourceProvider can be used to access resources synchronously from so
     }
 }
 
+#ifndef REX_DISABLE_ASYNC
 SCENARIO("ResourceProvider can be used to access resources asynchronously from sources")
 {
     GIVEN("a resource provider with a source added")
@@ -517,6 +518,7 @@ SCENARIO("ResourceProvider can be used to access all resources from a source in 
         }
     }
 }
+#endif
 
 SCENARIO("Resources in valid sources can be marked as unused")
 {

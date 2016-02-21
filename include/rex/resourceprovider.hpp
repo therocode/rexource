@@ -1,15 +1,22 @@
 #pragma once
 #include <rex/config.hpp>
+
+#ifndef REX_DISABLE_ASYNC
 #include <mutex>
+#endif 
+
 #include <unordered_map>
 
 #include <rex/thero.hpp>
 
-#include <rex/asyncresourceview.hpp>
 #include <rex/exceptions.hpp>
 #include <rex/resourceview.hpp>
 #include <rex/sourceview.hpp>
+
+#ifndef REX_DISABLE_ASYNC
+#include <rex/asyncresourceview.hpp>
 #include <rex/threadpool.hpp>
+#endif 
 
 namespace rex
 {
@@ -48,6 +55,7 @@ namespace rex
             std::vector<ResourceView<ResourceType>> get(const std::string& sourceId, const std::vector<std::string>& resourceIds) const;
             template <typename ResourceType>
             std::vector<ResourceView<ResourceType>> getAll(const std::string& sourceId) const;
+#ifndef REX_DISABLE_ASYNC
             //async get
             template <typename ResourceType>
             AsyncResourceView<ResourceType> asyncGet(const std::string& sourceId, const std::string& resourceId) const;
@@ -55,6 +63,7 @@ namespace rex
             std::vector<AsyncResourceView<ResourceType>> asyncGet(const std::string& sourceId, const std::vector<std::string>& resourceIds) const;
             template <typename ResourceType>
             std::vector<AsyncResourceView<ResourceType>> asyncGetAll(const std::string& sourceId) const;
+#endif
             //free
             void markUnused(const std::string& sourceId, const std::string& resourceId);
             void markAllUnused(const std::string& sourceId);
@@ -68,13 +77,17 @@ namespace rex
             void waitForSourceAsync(const std::string& sourceId) const;
             std::unordered_map<std::string, SourceEntry> mSources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mResources;
+#ifndef REX_DISABLE_ASYNC
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mAsyncProcesses;
             mutable std::recursive_mutex mResourceMutex;
             mutable ThreadPool mThreadPool;
+#endif
     };
 
-    inline ResourceProvider::ResourceProvider(int32_t workerCount):
-        mThreadPool(workerCount)
+    inline ResourceProvider::ResourceProvider(int32_t workerCount)
+#ifndef REX_DISABLE_ASYNC
+        :mThreadPool(workerCount)
+#endif
     {
     }
 
@@ -114,12 +127,16 @@ namespace rex
 
         WaitFunction waitFunction = [] (const th::Any& packedFuture)
         {
+#ifndef REX_DISABLE_ASYNC
             packedFuture.get<std::shared_future<const ResourceType&>>().wait();
+#endif
         };
 
         auto added = mSources.emplace(sourceId, SourceEntry{std::move(source), loadingFunction, listingFunction, waitFunction, typeid(ResourceType)});
         mResources[sourceId];
+#ifndef REX_DISABLE_ASYNC
         mAsyncProcesses[sourceId];
+#endif
 
         if(added.second)
             return sourceIteratorToView<SourceType>(added.first);
@@ -140,7 +157,9 @@ namespace rex
     inline bool ResourceProvider::removeSource(const std::string& sourceId)
     {
         mResources.erase(sourceId);
+#ifndef REX_DISABLE_ASYNC
         mAsyncProcesses.erase(sourceId);
+#endif
 
         return mSources.erase(sourceId) != 0;
     }
@@ -149,7 +168,9 @@ namespace rex
     {
         mSources.clear();
         mResources.clear();
+#ifndef REX_DISABLE_ASYNC
         mAsyncProcesses.clear();
+#endif
     }
 
     inline std::vector<std::string> ResourceProvider::list(const std::string& sourceId) const
@@ -178,6 +199,7 @@ namespace rex
             if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
                 throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
 
+#ifndef REX_DISABLE_ASYNC
             std::shared_future<const ResourceType&> futureToWaitFor;
 
             {
@@ -200,6 +222,13 @@ namespace rex
             futureToWaitFor.wait();
 
             return futureToWaitFor.get();
+#else
+            //Without async, it is either loaded or not, so just return it or load-return it
+            if(mResources.at(sourceId).count(resourceId) != 0)
+                return mResources.at(sourceId).at(resourceId).get<ResourceType>();
+			else
+				return loadResource<ResourceType>(sourceId, resourceId);
+#endif
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -233,6 +262,7 @@ namespace rex
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
+#ifndef REX_DISABLE_ASYNC
     template <typename ResourceType>
     AsyncResourceView<ResourceType> ResourceProvider::asyncGet(const std::string& sourceId, const std::string& resourceId) const
     {
@@ -311,6 +341,7 @@ namespace rex
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
+#endif
 
     inline void ResourceProvider::markUnused(const std::string& sourceId, const std::string& resourceId)
     {
@@ -318,6 +349,7 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
+#ifndef REX_DISABLE_ASYNC
             auto waitFunction = sourceIterator->second.waitFunction;
             auto asyncIter = mAsyncProcesses.at(sourceId).find(resourceId);
 
@@ -329,6 +361,9 @@ namespace rex
                 mResources.at(sourceId).erase(resourceId);
                 mAsyncProcesses.at(sourceId).erase(resourceId);
             }
+#else
+            mResources.at(sourceId).erase(resourceId);
+#endif
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -340,6 +375,7 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
+#ifndef REX_DISABLE_ASYNC
             waitForSourceAsync(sourceId);
 
             {
@@ -347,6 +383,9 @@ namespace rex
                 mResources.at(sourceId).clear();
                 mAsyncProcesses.at(sourceId).clear();
             }
+#else
+            mResources.at(sourceId).clear();
+#endif
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -374,11 +413,13 @@ namespace rex
 
     inline bool ResourceProvider::resourceLoadInProgress(const std::string& sourceId, const std::string& resourceId) const
     {
+#ifndef REX_DISABLE_ASYNC
         auto sourceIterator = mAsyncProcesses.find(sourceId);
 
         if(sourceIterator != mAsyncProcesses.end())
             return sourceIterator->second.count(resourceId);
 
+#endif
         return false;
     }
 
@@ -394,6 +435,7 @@ namespace rex
                 auto loadFunction = sourceIterator->second.loadingFunction.get<LoadingFunction<ResourceType>>();
                 auto resource = loadFunction(sourceIterator->second.source, resourceId);
 
+#ifndef REX_DISABLE_ASYNC
                 {
                     std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
                     auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
@@ -402,6 +444,10 @@ namespace rex
 
                     return emplaced.first->second.template get<ResourceType>();
                 }
+#else
+				auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
+				return emplaced.first->second.template get<ResourceType>();
+#endif
             }
             catch(const std::exception& exception)
             {
@@ -414,6 +460,7 @@ namespace rex
 
     inline void ResourceProvider::waitForSourceAsync(const std::string& sourceId) const
     {
+#ifndef REX_DISABLE_ASYNC
         auto sourceIterator = mSources.find(sourceId);
 
         if(sourceIterator != mSources.end())
@@ -423,5 +470,6 @@ namespace rex
             for(auto& asyncIter : mAsyncProcesses.at(sourceId))
                 waitFunction(asyncIter.second);
         }
+#endif
     }
 }

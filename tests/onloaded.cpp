@@ -5,6 +5,7 @@
 
 #include "helpers/treefilesource.hpp"
 
+#ifndef REX_DISABLE_ASYNC
 SCENARIO("OnLoaded can be used to make callback functions execute on successfully loaded objects")
 {
     GIVEN("a resource provider with a source set up")
@@ -88,3 +89,4 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
         }
     }
 }
+#endif
