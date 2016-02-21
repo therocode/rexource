@@ -33,7 +33,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
 
                 size_t lastSize = loadedTreeIds.size();
 
-                while(tracker.status().waiting > 0)
+                while(tracker.status().waiting() > 0)
                 {
                     onLoaded.poll();
 
@@ -70,7 +70,7 @@ SCENARIO("OnLoaded can be used to make callback functions execute on successfull
 
                 size_t lastSize = loadedTreeIds.size();
 
-                while(tracker.status().waiting > 0)
+                while(tracker.status().waiting() > 0)
                 {
                     onLoaded.poll();
 

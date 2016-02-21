@@ -19,7 +19,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
             THEN("the tracker reports the correct total amount")
             {
                 CHECK(tracker.total() == 1000);
-                CHECK(tracker.status().total == 1000);
+                CHECK(tracker.status().total() == 1000);
             }
 
             THEN("constantly polling the tracker gives reasonable values")
@@ -33,13 +33,13 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
                 {
                     rex::ProgressTracker<Tree>::Status status = tracker.status();
 
-                    int32_t newDone = status.done;
-                    int32_t newWaiting = status.waiting;
-                    int32_t failed = status.failed;
+                    int32_t newDone = status.done();
+                    int32_t newWaiting = status.waiting();
+                    int32_t failed = status.failed();
 
-                    float newDoneRatio = status.doneRatio;
-                    float newWaitingRatio = status.waitingRatio;
-                    float failedRatio = status.failedRatio;
+                    float newDoneRatio = status.doneRatio();
+                    float newWaitingRatio = status.waitingRatio();
+                    float failedRatio = status.failedRatio();
 
                     CHECK(newDone >= lastDone);
                     CHECK(newWaiting <= lastWaiting);
@@ -60,10 +60,10 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
 
                 CHECK(lastDone == 1000);
                 CHECK(lastWaiting == 0);
-                CHECK(status.failed == 0);
+                CHECK(status.failed() == 0);
                 CHECK(lastDoneRatio == 1.0f);
                 CHECK(lastWaitingRatio == 0.0f);
-                CHECK(status.failedRatio == 0.0f);
+                CHECK(status.failedRatio() == 0.0f);
             }
         }
 
@@ -74,7 +74,7 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
             THEN("the tracker reports the correct total amount")
             {
                 CHECK(tracker.total() == 8);
-                CHECK(tracker.status().total == 8);
+                CHECK(tracker.status().total() == 8);
             }
 
             THEN("constantly polling the tracker gives reasonable values")
@@ -90,13 +90,13 @@ SCENARIO("ProgressTracker can tell the current progress of an async loading proc
                 {
                     rex::ProgressTracker<Tree>::Status status = tracker.status();
 
-                    int32_t newDone = status.done;
-                    int32_t newWaiting = status.waiting;
-                    int32_t newFailed = status.failed;
+                    int32_t newDone = status.done();
+                    int32_t newWaiting = status.waiting();
+                    int32_t newFailed = status.failed();
 
-                    float newDoneRatio = status.doneRatio;
-                    float newFailedRatio = status.failedRatio;
-                    float newWaitingRatio = status.waitingRatio;
+                    float newDoneRatio = status.doneRatio();
+                    float newFailedRatio = status.failedRatio();
+                    float newWaitingRatio = status.waitingRatio();
 
                     CHECK(newDone >= lastDone);
                     CHECK(newWaiting <= lastWaiting);
