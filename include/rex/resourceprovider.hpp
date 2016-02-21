@@ -60,9 +60,9 @@ namespace rex
             template <typename SourceType>
             SourceView<SourceType> sourceIteratorToView(std::unordered_map<std::string, SourceEntry>::const_iterator iterator) const;
             bool resourceReady(const std::string& sourceId, const std::string& resourceId) const;
-            bool resourceLoadInitiated(const std::string& sourceId, const std::string& resourceId) const;
+            bool resourceLoadInProgress(const std::string& sourceId, const std::string& resourceId) const;
             template <typename ResourceType>
-            const ResourceType& loadResource(const std::string& sourceId, const std::string& resourceId) const;
+            const ResourceType& loadGetResource(const std::string& sourceId, const std::string& resourceId) const;
             std::unordered_map<std::string, SourceEntry> mSources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mResources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mAsyncProcesses;
@@ -165,22 +165,12 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
+            const auto& source = sourceIterator->second.source;
+
             if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
                 throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
 
-            const auto& source = sourceIterator->second.source;
-
-            if(resourceReady(sourceId, resourceId))
-            {
-                return mResources.at(sourceId).at(resourceId).get<ResourceType>();
-            }
-            else
-            {
-                AsyncResourceView<ResourceType> asyncView = asyncGet<ResourceType>(sourceId, resourceId);
-
-                asyncView.future.wait();
-                return asyncView.future.get();
-            }
+            return ResourceProvider::loadGetResource<ResourceType>(sourceId, resourceId);
         }
         else
             throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
@@ -189,43 +179,29 @@ namespace rex
     template <typename ResourceType>
     std::vector<ResourceView<ResourceType>> ResourceProvider::get(const std::string& sourceId, const std::vector<std::string>& resourceIds) const
     {
-        auto sourceIterator = mSources.find(sourceId);
+        std::vector<ResourceView<ResourceType>> result;
 
-        if(sourceIterator != mSources.end())
-        {
-            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
-                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
+        for(const std::string& resourceId : resourceIds)
+            result.emplace_back(ResourceView<ResourceType>{resourceId, get<ResourceType>(sourceId, resourceId)});
 
-            if(resourceLoadInitiated(sourceId, resourceId))
-            {
-                auto& future = mAsyncProcesses.at(sourceId).at(resourceId).get<std::shared_future<const ResourceType&>>();
-                future.wait();
-                return future.get();
-            }
-            else
-            {
-                auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
-                std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
-                auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
-                return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
-            }
-        }
-        else
-            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+        return result;
     }
 
     template <typename ResourceType>
     std::vector<ResourceView<ResourceType>> ResourceProvider::getAll(const std::string& sourceId) const
     {
-        std::vector<AsyncResourceView<ResourceType>> asyncViews = asyncGetAll<ResourceType>(sourceId);
-        std::vector<ResourceView<ResourceType>> result;
+        auto sourceIterator = mSources.find(sourceId);
 
-        for(auto& asyncView : asyncViews)
+        if(sourceIterator != mSources.end())
         {
-            result.emplace_back(ResourceView<ResourceType>{asyncView.identifier, asyncView.future.get()});
-        }
+            const auto& source = sourceIterator->second.source;
 
-        return result;
+            std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
+
+            return get<ResourceType>(sourceId, idList);
+        }
+        else
+            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
     }
 
     template <typename ResourceType>
@@ -238,16 +214,40 @@ namespace rex
             if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
                 throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
 
-            if(resourceLoadInitiated(sourceId, resourceId))
+            bool resourceIsReady = false;
+
             {
-                return AsyncResourceView<ResourceType>{resourceId, mAsyncProcesses.at(sourceId).at(resourceId).get<std::shared_future<const ResourceType&>>()};
+                std::lock_guard<std::mutex> lock(mResourceMutex);
+                resourceIsReady = resourceReady(sourceId, resourceId);
+            }
+
+            if(resourceIsReady)
+            {//the resource is ready and this won't change from another thread
+                //make and return instantly valid future
+
+                throw std::runtime_error("oops oops");
             }
             else
             {
-                auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
+                {
+                    std::lock_guard<std::mutex> lock(mResourceMutex);
+
+                    if(resourceLoadInProgress(sourceId, resourceId))
+                    {//there is a future ready to piggyback on
+                        return AsyncResourceView<ResourceType>{resourceId, mAsyncProcesses.at(sourceId).at(resourceId).get<std::shared_future<const ResourceType&>>()};
+                    }
+                }
+
+                //if we reached here, it means that there is no currently loaded resource and no process to load it, and this won't change, so it is safe to start loading
+                auto boundLaunch = std::bind(&ResourceProvider::loadGetResource<ResourceType>, this, sourceId, resourceId);
                 std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
-                auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
-                return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
+
+                {//other threads can still affect the storage on other resources though so we better lock
+                    std::lock_guard<std::mutex> lock(mResourceMutex);
+
+                    auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
+                    return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
+                }
             }
         }
         else
@@ -257,24 +257,12 @@ namespace rex
     template <typename ResourceType>
     std::vector<AsyncResourceView<ResourceType>> ResourceProvider::asyncGet(const std::string& sourceId, const std::vector<std::string>& resourceIds) const
     {
-        auto sourceIterator = mSources.find(sourceId);
+        std::vector<AsyncResourceView<ResourceType>> result;
 
-        if(sourceIterator != mSources.end())
-        {
-            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
-                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
+        for(const std::string& resourceId : resourceIds)
+            result.emplace_back(asyncGet<ResourceType>(sourceId, resourceId));
 
-            const auto& source = sourceIterator->second.source;
-
-            std::vector<AsyncResourceView<ResourceType>> result;
-
-            for(const std::string& identifier : resourceIds)
-                result.emplace_back(asyncGet<ResourceType>(sourceId, identifier));
-
-            return result;
-        }
-        else
-            throw InvalidSourceException("trying to access source id " + sourceId + " which doesn't exist");
+        return result;
     }
 
     template <typename ResourceType>
@@ -284,9 +272,6 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
-            if(std::type_index(typeid(ResourceType)) != sourceIterator->second.typeProvided)
-                throw InvalidSourceException("trying to access source id " + sourceId + " as the wrong type");
-
             const auto& source = sourceIterator->second.source;
 
             std::vector<std::string> idList = sourceIterator->second.listingFunction(source);
@@ -303,6 +288,8 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
+            //TODO wait for futures before deleting
+            std::lock_guard<std::mutex> lock(mResourceMutex);
             mResources.at(sourceId).erase(resourceId);
             mAsyncProcesses.at(sourceId).erase(resourceId);
         }
@@ -316,6 +303,8 @@ namespace rex
 
         if(sourceIterator != mSources.end())
         {
+            //TODO wait for futures before deleting
+            std::lock_guard<std::mutex> lock(mResourceMutex);
             mResources.at(sourceId).clear();
             mAsyncProcesses.at(sourceId).clear();
         }
@@ -338,12 +327,12 @@ namespace rex
         auto sourceIterator = mResources.find(sourceId);
 
         if(sourceIterator != mResources.end())
-            return sourceIterator->second.count(resourceId);
+            return sourceIterator->second.count(resourceId) != 0;
 
         return false;
     }
 
-    inline bool ResourceProvider::resourceLoadInitiated(const std::string& sourceId, const std::string& resourceId) const
+    inline bool ResourceProvider::resourceLoadInProgress(const std::string& sourceId, const std::string& resourceId) const
     {
         auto sourceIterator = mAsyncProcesses.find(sourceId);
 
@@ -353,8 +342,9 @@ namespace rex
         return false;
     }
 
+    //NOTE: should be only a loader. get<> has to check existence before loading, and wait for processes? etc etc etc etc
     template <typename ResourceType>
-    const ResourceType& ResourceProvider::loadResource(const std::string& sourceId, const std::string& resourceId) const
+    const ResourceType& ResourceProvider::loadGetResource(const std::string& sourceId, const std::string& resourceId) const
     {
         auto sourceIterator = mSources.find(sourceId);
 
@@ -362,14 +352,24 @@ namespace rex
         {
             try
             {
-                auto loadFunction = sourceIterator->second.loadingFunction.get<LoadingFunction<ResourceType>>();
-                auto resource = loadFunction(sourceIterator->second.source, resourceId);
+                //lock needed here for resourceReady ??? YES it is, and it won't change?? not needed at all if up there is true ^^^^^^^
+                if(!resourceReady(sourceId, resourceId))
+                {
+                    auto loadFunction = sourceIterator->second.loadingFunction.get<LoadingFunction<ResourceType>>();
+                    auto resource = loadFunction(sourceIterator->second.source, resourceId);
 
+                    {
+                        std::lock_guard<std::mutex> lock(mResourceMutex);
+                        auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
+
+                        //TODO: remove async process!!!!!!!!!!
+                        return emplaced.first->second.template get<ResourceType>();
+                    }
+                }
+                else
                 {
                     std::lock_guard<std::mutex> lock(mResourceMutex);
-                    auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
-
-                    return emplaced.first->second.template get<ResourceType>();
+                    return mResources.at(sourceId).at(resourceId).template get<ResourceType>();
                 }
             }
             catch(const std::exception& exception)
