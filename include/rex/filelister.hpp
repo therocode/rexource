@@ -24,7 +24,9 @@ namespace rex
         int32_t result = tinydir_open(&folder, folderPath.c_str());
 
         if(result != 0)
-            throw InvalidFileException("given path '" + folderPath + "' is not a directory");
+            throw InvalidFileException("given path '" + folderPath + "' is not a valid directory");
+        else
+            tinydir_close(&folder);
     }
 
     inline std::vector<std::string> FileLister::list() const
@@ -38,7 +40,10 @@ namespace rex
     inline void FileLister::fetchFilesRecursively(const std::string& folderPath, std::vector<std::string>& output) const
     {
         tinydir_dir folder;
-        tinydir_open(&folder, folderPath.c_str());
+        int32_t result = tinydir_open(&folder, folderPath.c_str());
+
+        if(result != 0)
+            throw InvalidFileException("given path '" + folderPath + "' is not a valid directory");
 
         while(folder.has_next)
         {
@@ -73,5 +78,7 @@ namespace rex
                 output.push_back(path);
             }
         }
+
+        tinydir_close(&folder);
     }
 }
