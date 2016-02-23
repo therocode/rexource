@@ -1,5 +1,6 @@
 #pragma once
 #include <rex/config.hpp>
+#include <string>
 
 namespace rex
 {
