@@ -26,7 +26,7 @@ namespace rex
     template <typename ResourceType>
     FileSource<ResourceType>::FileSource(const Path& folder, const std::regex& regex, Naming naming)
     {
-        FileLister lister(folder);
+        FileLister lister(folder, FileLister::FILES);
         auto pathList = lister.list();
 
         for(const auto& path : pathList)

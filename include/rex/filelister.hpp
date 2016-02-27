@@ -11,15 +11,19 @@ namespace rex
     class FileLister
     {
         public:
-            FileLister(Path folderPath);
+            enum Mode {FILES, FOLDERS, ALL};
+
+            FileLister(Path folderPath, Mode listingMode);
             std::vector<Path> list() const;
         private:
             void fetchFilesRecursively(const Path& folder, std::vector<Path>& output) const;
             Path mFolderPath;
+            Mode mMode;
     };
 
-    inline FileLister::FileLister(Path folderPath):
-        mFolderPath(std::move(folderPath))
+    inline FileLister::FileLister(Path folderPath, Mode listingMode):
+        mFolderPath(std::move(folderPath)),
+        mMode(listingMode)
     {
         tinydir_dir folder;
         int32_t result = tinydir_open(&folder, mFolderPath.str().c_str());
@@ -74,7 +78,18 @@ namespace rex
             {
                 fetchFilesRecursively(path, output);
             }
-            else
+
+            if(mMode == FILES)
+            {
+                if(!file.is_dir)
+                    output.push_back(path);
+            }
+            else if(mMode == FOLDERS)
+            {
+                if(file.is_dir)
+                    output.push_back(path);
+            }
+            else if(mMode == ALL)
             {
                 output.push_back(path);
             }
