@@ -8,13 +8,13 @@ endif()
 set(BUNDLE_THERO TRUE CACHE BOOL "Will include the needed files from the thero support library. If not set, it must be installed separately")
 set(BUNDLE_TINYDIR TRUE CACHE BOOL "Will include the needed files from the tinydir file library. If not set, it must be installed separately")
 set(BUNDLE_JSON TRUE CACHE BOOL "Will include the needed files from the nlohmann json library. If not set, it must be installed separately")
-set(INSTALL_SFML_LOADERS FALSE CACHE BOOL "Will include the resource loaders for SFML resources")
-set(INSTALL_FEATHERKIT_LOADERS FALSE CACHE BOOL "Will include the resource loaders for Feather Kit resources")
+set(INCLUDE_SFML_LOADERS FALSE CACHE BOOL "Will include the resource loaders for SFML resources")
+set(INCLUDE_FEATHERKIT_LOADERS FALSE CACHE BOOL "Will include the resource loaders for Feather Kit resources")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
 set(BUILD_TESTS TRUE CACHE BOOL "build the tests")
-#set(BUILD_EXAMPLES TRUE CACHE BOOL "build the examples")
+set(DISABLE_ASYNC FALSE CACHE BOOL "builds the tests without asynchronous components")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)  #for static libs 
  
@@ -22,6 +22,10 @@ set(project_name rexources)
 project(${project_name} CXX)
 
 add_definitions("-DREX_DISABLE_CONFIG")
+
+if(DISABLE_ASYNC)
+    add_definitions("-DREX_DISABLE_ASYNC")
+endif()
 
 set(header_files
     include/rex/assert.hpp
@@ -33,13 +37,24 @@ set(header_files
     include/rex/json.hpp
     include/rex/onloaded.hpp
     include/rex/progresstracker.hpp
+    include/rex/path.hpp
     include/rex/resourceprovider.hpp
     include/rex/resourceview.hpp
+    include/rex/sfml.hpp
     include/rex/sourceview.hpp
     include/rex/thero.hpp
     include/rex/threadpool.hpp
     include/rex/tinydir.hpp
 )
+
+if(INCLUDE_SFML_LOADERS)
+    list(APPEND header_files
+        include/rex/sfml/texturefilesource.hpp
+        include/rex/sfml/imagefilesource.hpp
+        include/rex/sfml/soundbufferfilesource.hpp
+        include/rex/sfml/fontfilesource.hpp
+    )
+endif()
 
 include_directories("include")
 include_directories("thero/include")
@@ -49,24 +64,29 @@ include_directories("json/src")
 #tests
 if(BUILD_TESTS)
     include_directories(tests)
-    add_executable(tests "tests/main.cpp"
+
+    set(test_sources
+        "tests/main.cpp"
         "tests/helpers/peoplesource.cpp"
         "tests/helpers/toolsource.cpp"
         "tests/filesource.cpp"
         "tests/filelister.cpp"
         "tests/onloaded.cpp"
+        "tests/path.cpp"
         "tests/progresstracker.cpp"
         "tests/resourceprovider.cpp"
         "tests/threadpool.cpp"
-        )
+    )
 
-    set_property(TARGET tests PROPERTY CXX_STANDARD 14)
+    add_executable(tests ${test_sources})
+
+    set_property(TARGET tests PROPERTY CXX_STANDARD 11)
     set_property(TARGET tests PROPERTY CXX_STANDARD_REQUIRED ON)
 
     find_package(Threads)
 
     target_link_libraries(tests ${CMAKE_THREAD_LIBS_INIT})
-endif(BUILD_TESTS)
+endif()
 
 #installation
 if(WIN32)

@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <rex/exceptions.hpp>
+#include <rex/path.hpp>
 #include <rex/tinydir.hpp>
 
 namespace rex
@@ -10,40 +11,40 @@ namespace rex
     class FileLister
     {
         public:
-            FileLister(const std::string& folderPath);
-            std::vector<std::string> list() const;
+            FileLister(Path folderPath);
+            std::vector<Path> list() const;
         private:
-            void fetchFilesRecursively(const std::string& folder, std::vector<std::string>& output) const;
-            std::string mFolderPath;
+            void fetchFilesRecursively(const Path& folder, std::vector<Path>& output) const;
+            Path mFolderPath;
     };
 
-    inline FileLister::FileLister(const std::string& folderPath):
-        mFolderPath(folderPath)
+    inline FileLister::FileLister(Path folderPath):
+        mFolderPath(std::move(folderPath))
     {
         tinydir_dir folder;
-        int32_t result = tinydir_open(&folder, folderPath.c_str());
+        int32_t result = tinydir_open(&folder, mFolderPath.str().c_str());
 
         if(result != 0)
-            throw InvalidFileException("given path '" + folderPath + "' is not a valid directory");
+            throw InvalidFileException("given path '" + mFolderPath.str() + "' is not a valid directory");
         else
             tinydir_close(&folder);
     }
 
-    inline std::vector<std::string> FileLister::list() const
+    inline std::vector<Path> FileLister::list() const
     {
-        std::vector<std::string> result;
+        std::vector<Path> result;
         fetchFilesRecursively(mFolderPath, result);
 
         return result;
     }
 
-    inline void FileLister::fetchFilesRecursively(const std::string& folderPath, std::vector<std::string>& output) const
+    inline void FileLister::fetchFilesRecursively(const Path& folderPath, std::vector<Path>& output) const
     {
         tinydir_dir folder;
-        int32_t result = tinydir_open(&folder, folderPath.c_str());
+        int32_t result = tinydir_open(&folder, folderPath.str().c_str());
 
         if(result != 0)
-            throw InvalidFileException("given path '" + folderPath + "' is not a valid directory");
+            throw InvalidFileException("given path '" + folderPath.str() + "' is not a valid directory");
 
         while(folder.has_next)
         {

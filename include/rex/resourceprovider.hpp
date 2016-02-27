@@ -10,6 +10,7 @@
 #include <rex/thero.hpp>
 
 #include <rex/exceptions.hpp>
+#include <rex/exceptions.hpp>
 #include <rex/resourceview.hpp>
 #include <rex/sourceview.hpp>
 

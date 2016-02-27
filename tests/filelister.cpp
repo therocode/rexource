@@ -5,11 +5,11 @@ SCENARIO("File listers can be used to list all files in a folder recursively")
 {
     GIVEN("a file lister with a given directory path")
     {
-        rex::FileLister fileLister("tests/data/folders");
+        rex::FileLister fileLister(std::string("tests/data/folders"));
 
         WHEN("the lister is asked for a file list")
         {
-            std::vector<std::string> fileList = fileLister.list();
+            std::vector<rex::Path> fileList = fileLister.list();
 
             THEN("the list contains all the contained files - excluding folders")
             {
