@@ -19,7 +19,7 @@ namespace rex
             std::vector<std::string> list() const;
         protected:
             virtual ResourceType loadFromFile(const Path& path) const = 0;
-            std::string extractName(const std::string path, Naming naming);
+            std::string extractName(const Path& path, Naming naming);
             std::unordered_map<std::string, Path> mFiles;
     };
 
@@ -64,29 +64,21 @@ namespace rex
     }
 
     template <typename ResourceType>
-    std::string FileSource<ResourceType>::extractName(const std::string path, Naming naming)
+    std::string FileSource<ResourceType>::extractName(const Path& path, Naming naming)
     {
-        size_t lastSeparator = path.find_last_of('/');
-        size_t lastPeriod = path.find_last_of('.');
-
-        std::string name;
-
         if(naming == Naming::NO_EXT)
         {
-            if(lastPeriod > lastSeparator)
-                name = path.substr(lastSeparator + 1, lastPeriod - lastSeparator - 1);
-            else
-                name = path.substr(lastSeparator + 1);
+            return path.stem();
         }
         else if(naming == Naming::FILE_NAME)
         {
-            name = path.substr(lastSeparator + 1);
+            return path.fileName();
         }
         else if(naming == Naming::PATH)
         {
             return path;
         }
 
-        return name;
+        return "";
     }
 };
