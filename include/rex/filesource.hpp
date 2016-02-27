@@ -49,7 +49,14 @@ namespace rex
     template <typename ResourceType>
     ResourceType FileSource<ResourceType>::load(const std::string& id) const
     {
-        return loadFromFile(mFiles.at(id));
+    	try 
+    	{   
+    	    return loadFromFile(mFiles.at(id));
+    	}   
+    	catch(const std::exception& e)
+    	{   
+    	    throw rex::InvalidResourceException("With resource '" + id + "', " + e.what());
+    	}   
     }
 
     template <typename ResourceType>
