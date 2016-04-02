@@ -39,6 +39,12 @@ namespace rex
 
         public:
             ResourceProvider(int32_t workerCount = 10);
+#ifndef REX_DISABLE_ASYNC
+            ResourceProvider(const ResourceProvider& other) = delete;
+            ResourceProvider& operator=(const ResourceProvider& other) = delete;
+            ResourceProvider(ResourceProvider&& other);
+            ResourceProvider& operator=(ResourceProvider&& other);
+#endif
             //sources
             template <typename SourceType>
             SourceView<SourceType> source(const std::string& sourceId) const;
@@ -75,21 +81,46 @@ namespace rex
             const ResourceType& loadResource(const std::string& sourceId, const std::string& resourceId) const;
             void waitForSourceAsync(const std::string& sourceId) const;
             const SourceEntry& toSourceEntry(const std::string& sourceId) const;
+
             std::unordered_map<std::string, SourceEntry> mSources;
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mResources;
 #ifndef REX_DISABLE_ASYNC
             mutable std::unordered_map<std::string, std::unordered_map<std::string, th::Any>> mAsyncProcesses;
-            mutable std::recursive_mutex mResourceMutex;
-            mutable ThreadPool mThreadPool;
+            mutable std::shared_ptr<std::recursive_mutex> mResourceMutex;
+            mutable std::shared_ptr<ThreadPool> mThreadPool;
 #endif
     };
 
     inline ResourceProvider::ResourceProvider(int32_t workerCount)
 #ifndef REX_DISABLE_ASYNC
-        :mThreadPool(workerCount)
+        :
+         mResourceMutex(std::make_shared<std::recursive_mutex>()),
+         mThreadPool(std::make_shared<ThreadPool>(workerCount))
 #endif
     {
     }
+
+#ifndef REX_DISABLE_ASYNC
+    inline ResourceProvider::ResourceProvider(ResourceProvider&& other)
+    {
+        mSources = std::move(other.mSources);
+        mResources = std::move(other.mResources);
+        mAsyncProcesses = std::move(other.mAsyncProcesses);
+        mResourceMutex = std::move(other.mResourceMutex);
+        mThreadPool = std::move(mThreadPool);
+    }
+
+    inline ResourceProvider& ResourceProvider::operator=(ResourceProvider&& other)
+    {
+        mSources = std::move(other.mSources);
+        mResources = std::move(other.mResources);
+        mAsyncProcesses = std::move(other.mAsyncProcesses);
+        mResourceMutex = std::move(other.mResourceMutex);
+        mThreadPool = std::move(mThreadPool);
+
+        return *this;
+    }
+#endif
 
     template <typename SourceType>
     SourceView<SourceType> ResourceProvider::source(const std::string& sourceId) const
@@ -197,7 +228,7 @@ namespace rex
         std::shared_future<const ResourceType&> futureToWaitFor;
 
         {
-            std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+            std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
 
             //there are three possible cases, and with the lock on, these won't change
             
@@ -258,7 +289,7 @@ namespace rex
         bool resourceIsReady = false;
 
         {
-            std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+            std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
             resourceIsReady = resourceReady(sourceId, resourceId);
         }
 
@@ -272,7 +303,7 @@ namespace rex
         else
         {
             {
-                std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+                std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
 
                 if(resourceLoadInProgress(sourceId, resourceId))
                 {//there is a future ready to piggyback on
@@ -282,10 +313,10 @@ namespace rex
 
             //if we reached here, it means that there is no currently loaded resource and no process to load it, and this won't change, so it is safe to start loading
             {//other threads can still affect the storage on other resources though so we better lock
-                std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+                std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
 
                 auto boundLaunch = std::bind(&ResourceProvider::loadResource<ResourceType>, this, sourceId, resourceId);
-                std::shared_future<const ResourceType&> futureResource = mThreadPool.enqueue(std::move(boundLaunch), 0);
+                std::shared_future<const ResourceType&> futureResource = mThreadPool->enqueue(std::move(boundLaunch), 0);
 
                 auto emplaced = mAsyncProcesses.at(sourceId).emplace(resourceId, std::move(futureResource));
                 return AsyncResourceView<ResourceType>{resourceId, emplaced.first->second.template get<std::shared_future<const ResourceType&>>()};
@@ -326,7 +357,7 @@ namespace rex
             waitFunction(asyncIter->second);
 
         {
-            std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+            std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
             mResources.at(sourceId).erase(resourceId);
             mAsyncProcesses.at(sourceId).erase(resourceId);
         }
@@ -343,7 +374,7 @@ namespace rex
         waitForSourceAsync(sourceId);
 
         {
-            std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+            std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
             mResources.at(sourceId).clear();
             mAsyncProcesses.at(sourceId).clear();
         }
@@ -386,7 +417,7 @@ namespace rex
 
 #ifndef REX_DISABLE_ASYNC
             {
-                std::lock_guard<std::recursive_mutex> lock(mResourceMutex);
+                std::lock_guard<std::recursive_mutex> lock(*mResourceMutex);
                 auto emplaced = mResources.at(sourceId).emplace(resourceId, std::move(resource));
 
                 mAsyncProcesses.at(sourceId).erase(resourceId);
